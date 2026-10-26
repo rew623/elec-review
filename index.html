@@ -1,0 +1,2041 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>전기설계 검토</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3552d6">
+<link rel="icon" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 레이아웃: 위에 도구줄, 가운데 도면 캔버스, 아래(넓은 화면에서는 오른쪽)에 심벌 그룹 목록 */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#1a2430; --muted:#5d6b7a; --line:#d3dae1;
+  --accent:#0a62c4; --accent-ink:#ffffff; --canvas:#ffffff; --seg:#1a2430; --seg2:#b9c3cc;
+  --ok:#1b7f4b; --warn:#b4570a; --bad:#b3261e; --okbg:#dff3e7; --warnbg:#fbe9d6; --badbg:#f9dedc;
+  --font:'IBM Plex Sans KR','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151a; --panel:#1a2128; --ink:#e6ebf0; --muted:#93a1b0; --line:#2c3640;
+    --accent:#5aa7ff; --accent-ink:#06121f; --canvas:#12181e; --seg:#dbe3ea; --seg2:#3a4651;
+    --ok:#5bd196; --warn:#f0a35e; --bad:#ff8a80; --okbg:#173325; --warnbg:#3a2a16; --badbg:#3b1d1b; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151a; --panel:#1a2128; --ink:#e6ebf0; --muted:#93a1b0; --line:#2c3640;
+  --accent:#5aa7ff; --accent-ink:#06121f; --canvas:#12181e; --seg:#dbe3ea; --seg2:#3a4651;
+  --ok:#5bd196; --warn:#f0a35e; --bad:#ff8a80; --okbg:#173325; --warnbg:#3a2a16; --badbg:#3b1d1b; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding-block:12px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+h1{font-size:18px;margin:0;font-weight:600;letter-spacing:-.01em;flex:1 1 auto}
+.priv{color:var(--muted);font-size:12px;flex-basis:100%}
+button,.btn{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-height:40px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--muted)}
+button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary,.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+#status.bad{color:var(--bad);font-weight:600}
+input[type=number],input[type=text]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-height:40px;min-width:0}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar .grow{flex:1 1 100%;order:2}
+.bar .tools{display:flex;flex-wrap:wrap;gap:8px;order:3}
+.pg{display:flex;gap:6px;align-items:center}
+.pg input{width:76px;font-family:var(--mono)}
+.main{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+@media (min-width:980px){.main{grid-template-columns:minmax(0,1fr) 360px;align-items:start}}
+.stage{background:var(--canvas);border:1px solid var(--line);border-radius:8px;position:relative;overflow:hidden;height:min(62vh,640px);min-height:320px}
+@media (min-width:980px){.stage{height:calc(100vh - 190px);min-height:480px}}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hint{position:absolute;left:10px;bottom:8px;right:10px;font-size:12px;color:var(--muted);pointer-events:none;text-shadow:0 0 4px var(--canvas),0 0 4px var(--canvas)}
+.info{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.panel h2{font-size:13px;margin:0 0 8px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.empty{color:var(--muted);font-size:13px}
+.group{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px;background:var(--panel)}
+.group.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.g1{display:flex;gap:8px;align-items:center}
+.sw{width:14px;height:14px;border-radius:50%;flex:none}
+.g1 input[type=text]{flex:1 1 auto}
+.g2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cnt{font-family:var(--mono);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.cnt small{font-size:12px;color:var(--muted);font-weight:500;font-family:var(--font)}
+.exp{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.exp input{width:84px;font-family:var(--mono)}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:3px 9px;font-family:var(--mono)}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.warn{background:var(--warnbg);color:var(--warn)}
+.pill.bad{background:var(--badbg);color:var(--bad)}
+.g3{display:flex;gap:6px;flex-wrap:wrap}
+.g3 button{min-height:34px;padding:5px 10px;font-size:13px}
+.note{font-size:12px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;font-size:13px;max-width:min(92vw,520px);z-index:20}
+.sum{width:100%;border-collapse:collapse;font-size:13px}
+.sum th,.sum td{padding:5px 6px;text-align:left;border-bottom:1px solid var(--line)}
+.sum td.n,.sum th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+
+[hidden]{display:none!important}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{min-height:40px}
+.cls-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cls-top input[type=text]{flex:1 1 220px}
+.cells{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media (min-width:760px){.cells{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1100px){.cells{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.cell{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0}
+.cell>summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;min-height:44px}
+.cell>summary::-webkit-details-marker{display:none}
+.cell .cn{font-weight:600;flex:1 1 140px}
+.cell .cc{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cell .rv{font-size:11px;border-radius:999px;padding:2px 8px;font-weight:600}
+.rv.on{background:var(--okbg);color:var(--ok)}
+.rv.off{background:var(--warnbg);color:var(--warn)}
+.rv.ref{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.plist{border-top:1px solid var(--line);max-height:340px;overflow:auto}
+.prow{display:flex;gap:8px;align-items:center;width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;text-align:left;justify-content:flex-start;min-height:42px;padding:6px 12px}
+.prow:last-child{border-bottom:0}
+.prow .pn{font-family:var(--mono);font-size:12px;color:var(--muted);flex:none;width:62px}
+.prow .pt{flex:1 1 auto;min-width:0}
+.prow .pp{font-family:var(--mono);font-size:12px;color:var(--accent);flex:none}
+.prow.miss .pt{color:var(--warn)}
+.prow .sub{color:var(--warn);font-size:11px}
+.prow.diff{background:var(--warnbg)}
+.cls-note{font-size:12px;color:var(--muted)}
+
+/* ===== 새 화면 스타일 (부드러운 카드형) ===== */
+:root{--bg:#f2f5fb;--panel:#ffffff;--ink:#1b2333;--muted:#667189;--line:#e1e6f0;--accent:#3552d6;--accent-ink:#fff;--accent-soft:#e8edff;
+  --ok:#17803f;--warn:#a85a00;--bad:#c42b1c;--info:#46618f;--okbg:#e2f6e9;--warnbg:#fff0d9;--badbg:#fde5e2;--infobg:#e9eef8;--shadow:0 1px 2px rgba(20,30,60,.06),0 4px 14px rgba(20,30,60,.05)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0f141c;--panel:#18202b;--ink:#e7ecf4;--muted:#9aa7bb;--line:#2a3544;--accent:#7b97ff;--accent-ink:#0a1130;--accent-soft:#222c52;--ok:#5bd196;--warn:#f0a35e;--bad:#ff8a80;--okbg:#173325;--warnbg:#3a2a16;--badbg:#3b1d1b;--infobg:#1f2a3c;--shadow:none}}
+body{background:var(--bg)}
+.wrap{gap:14px}
+button,.btn{border-radius:10px}
+.panel,.stage,.group{border-radius:14px}
+.top{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#4a6cf7,#7b4cf0);display:grid;place-items:center;font-size:24px;flex:none;box-shadow:var(--shadow)}
+.brand h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.02em}
+.brand .sub{color:var(--muted);font-size:13px}
+.priv2{background:var(--accent-soft);color:var(--ink);border-radius:12px;padding:8px 12px;font-size:12.5px}
+#status{font-size:13px;color:var(--muted)}
+#status.bad{color:var(--bad);font-weight:600}
+.progress{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4a6cf7,#7b4cf0);transition:width .15s}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.tabs2::-webkit-scrollbar{display:none}
+.tabs2 button{white-space:nowrap;border-radius:99px;padding:8px 16px;background:var(--panel);box-shadow:var(--shadow)}
+.tabs2 button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tabs2 .cnt2{font-size:11px;background:var(--badbg);color:var(--bad);border-radius:99px;padding:1px 7px;margin-left:6px;font-weight:700}
+section.view{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.card h2{font-size:15px;margin:0 0 8px;font-weight:700}
+.hero{text-align:center;padding:26px 16px}
+.hero .big{font-size:40px}
+.hero h2{font-size:18px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px;text-align:left}
+.step{background:var(--bg);border-radius:12px;padding:12px}
+.step b{display:block;margin-bottom:2px}
+.step span{font-size:12.5px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
+.stat .n{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1.1}
+.stat .l{font-size:12px;color:var(--muted)}
+.stat.bad .n{color:var(--bad)}.stat.warn .n{color:var(--warn)}.stat.ok .n{color:var(--ok)}.stat.info .n{color:var(--info)}
+.badge{font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 10px;white-space:nowrap}
+.badge.ok{background:var(--okbg);color:var(--ok)}.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.bad{background:var(--badbg);color:var(--bad)}.badge.info{background:var(--infobg);color:var(--info)}
+.issue{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.issue:first-child{border-top:0}
+.issue .ic{font-size:18px;line-height:1.3}
+.issue .tx{flex:1 1 auto;min-width:0;font-size:13.5px}
+.issue .tx small{display:block;color:var(--muted);font-size:12px}
+.issue button{min-height:34px;padding:4px 10px;font-size:12.5px}
+.banner{border-radius:12px;padding:10px 12px;font-size:13px}
+.banner.warn{background:var(--warnbg);color:var(--warn)}
+.banner.info{background:var(--infobg);color:var(--info)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border-radius:99px;min-height:34px;padding:4px 12px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media (min-width:900px){.list.two{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cab{border-left:5px solid var(--line)}
+.cab.sev-ok{border-left-color:var(--ok)}.cab.sev-warn{border-left-color:#e29a2e}.cab.sev-bad{border-left-color:var(--bad)}.cab.sev-info{border-left-color:var(--info)}
+.ch{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ch .no{font-family:var(--mono);font-size:12px;background:var(--bg);border-radius:8px;padding:2px 8px;color:var(--muted)}
+.ch b{flex:1 1 140px;font-size:15px;min-width:0;overflow-wrap:anywhere}
+.cs{font-size:12.5px;color:var(--muted);margin:4px 0 8px;overflow-wrap:anywhere}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px}
+.kv div{background:var(--bg);border-radius:10px;padding:7px 10px;font-size:12px;color:var(--muted)}
+.kv b{display:block;font-family:var(--mono);font-size:15px;color:var(--ink);font-weight:600}
+.kv b.bad{color:var(--bad)}.kv b.warn{color:var(--warn)}.kv b.ok{color:var(--ok)}
+.vdin{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.vdin label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.vdin input[type=number]{width:92px;font-family:var(--mono);min-height:36px}
+.vdin select{font:inherit;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-height:36px;padding:4px 6px}
+.gauge{position:relative;min-height:24px;border-radius:14px;background:var(--bg);overflow:hidden;margin-top:6px}
+.gauge i{position:absolute;inset:0 auto 0 0;border-radius:99px}
+.gauge i.ok{background:#8fd5a8}.gauge i.warn{background:#f3c078}.gauge i.bad{background:#f19b93}
+.gauge span{position:relative;display:block;padding:4px 10px;font-size:11.5px;font-family:var(--mono);color:var(--ink)}
+.fl{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px}
+.fl li{font-size:12.5px;padding:5px 9px;border-radius:8px}
+.fl li.bad{background:var(--badbg);color:var(--bad)}.fl li.warn{background:var(--warnbg);color:var(--warn)}.fl li.info{background:var(--infobg);color:var(--info)}
+details.set>summary{cursor:pointer;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px;min-height:34px}
+details.set>summary::-webkit-details-marker{display:none}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
+.setgrid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.setgrid input,.setgrid select{font:inherit;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-height:38px;padding:4px 8px}
+.amp{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px;margin-top:6px}
+.amp label{flex-direction:row;align-items:center;gap:6px}
+.amp input{width:62px;font-family:var(--mono)}
+.mini{font-size:12px;color:var(--muted)}
+.cir{font-size:12px;color:var(--muted);columns:2 220px;margin:8px 0 0;padding:0;list-style:none}
+.cir li{break-inside:avoid;padding:1px 0}
+.gd{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.gd ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.gd li{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;flex:none;margin-top:1px}
+.tag.auto{background:var(--okbg);color:var(--ok)}.tag.qty{background:var(--accent-soft);color:var(--accent)}.tag.man{background:var(--infobg);color:var(--info)}.tag.soon{background:var(--warnbg);color:var(--warn)}
+.cellhint{font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
+.cell{border-radius:14px;box-shadow:var(--shadow)}
+.empty2{color:var(--muted);text-align:center;padding:18px;font-size:13.5px}
+
+.issue button{white-space:nowrap;flex:none}
+.kecb{white-space:pre-wrap;font-size:13.5px;line-height:1.65;overflow-x:auto;background:var(--bg);border-radius:10px;padding:12px}
+mark{background:#ffe27a;color:#1b2333;border-radius:3px;padding:0 1px}
+.kres{display:block;text-align:left;width:100%;font:inherit;color:var(--ink)}
+a.keclink{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+
+.tchk{display:grid;gap:4px;margin-top:6px;max-height:320px;overflow:auto}
+.tchk label{font-size:12.5px;display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px solid var(--line)}
+.tchk input{margin-top:3px}
+
+.pgsel{flex:1 1 100%;order:1}
+.pgsel select{flex:1 1 auto;min-width:0;font:inherit;font-size:14px;min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:4px 8px}
+.pgsel button{min-width:42px;padding:6px}
+.bar .pg:not(.pgsel){display:none}
+.autop h2{font-size:15px;color:var(--ink)}
+.manp{display:flex;flex-direction:column;gap:10px}
+.manp[hidden]{display:none!important}
+.atbl{display:grid;gap:6px}
+.arow{display:grid;grid-template-columns:14px minmax(0,1fr) auto;grid-template-areas:"sw an aq" "sw st ab";gap:4px 8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.arow.act{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.arow .sw{grid-area:sw;align-self:start;margin-top:3px}
+.arow .an{grid-area:an;min-width:0;font-size:13.5px;overflow-wrap:anywhere}
+.arow .aq{grid-area:aq;text-align:right;font-family:var(--mono)}
+.arow .aq b{font-size:20px}
+.arow .badge{grid-area:st;justify-self:start}
+.arow .ab{grid-area:ab;display:flex;gap:4px}
+.arow .ab button{min-height:32px;padding:3px 9px;font-size:12.5px}
+tr.pk{cursor:pointer}tr.pk.act td{background:var(--accent-soft)}
+.sum .sw{width:10px;height:10px;border-radius:3px;vertical-align:middle}
+@media (min-width:980px){.main{grid-template-columns:minmax(0,1fr) 400px}}
+
+.hbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ver{font-family:var(--mono);font-size:12.5px;min-height:40px;color:var(--muted)}
+.updbar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#fff3bf;color:#5c3c00;border:1px solid #ffd43b;border-radius:12px;padding:8px 12px;font-weight:600}
+.updbar[hidden]{display:none!important}
+</style>
+<script>
+(function(){
+ var CDN='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+ function load(src,ok,fail){var s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=fail;document.head.appendChild(s)}
+ load('pdf.min.js',function(){window.__pdfWorker='pdf.worker.min.js'},function(){load(CDN+'pdf.min.js',function(){window.__pdfWorker=CDN+'pdf.worker.min.js'},function(){})});
+})();
+</script>
+</head>
+<body style="margin:0">
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="logo" aria-hidden="true">⚡</span><div><h1>전기설계 검토</h1><div class="sub">도면 PDF를 올리면 분류하고, 문제가 될 만한 곳부터 알려 드려요</div></div></div>
+    <div class="hbtns"><button type="button" id="installBtn" hidden>📲 앱 설치</button><button type="button" id="verBtn" class="ver" title="업데이트 확인">v</button><span class="filebtn btn primary">📂 도면 PDF 열기<input id="pdfFile" type="file" accept="application/pdf,.pdf" aria-label="PDF 파일 선택"></span></div>
+  </header>
+  <div class="updbar" id="updateBar" hidden>🔄 새 버전이 있습니다. <button id="updateBtn" type="button" class="primary">업데이트</button></div>
+  <div class="priv2">🔒 도면은 이 기기의 브라우저 안에서만 처리되고, 어디로도 전송되지 않습니다.</div>
+  <div id="status" role="status">PDF 라이브러리 확인 중…</div>
+  <div class="progress" hidden><i id="prog"></i></div>
+  <nav class="tabs2" id="tabs2" aria-label="화면 선택"></nav>
+
+  <section class="view" id="v-sum"></section>
+  <section class="view" id="v-cls" hidden>
+    <div class="cls-top"><input id="clsFind" type="text" placeholder="도면번호·도면명 검색 (예: 504, 분전반, 태양광)" aria-label="도면 검색"><span class="info" id="clsInfo"></span></div>
+    <div class="cells" id="cells"></div>
+    <p class="cls-note" id="clsNote"></p>
+  </section>
+  <section class="view" id="v-cab" hidden></section>
+  <section class="view" id="v-qty" hidden>
+<div class="bar">
+    <div class="pg pgsel"><button type="button" id="pgPrev" aria-label="이전 쪽">◀</button><select id="pageSel" aria-label="도면 선택"><option value="">도면을 고르세요</option></select><button type="button" id="pgNext" aria-label="다음 쪽">▶</button></div>
+    <div class="pg">
+      <input id="pageNo" type="number" min="1" step="1" value="1" aria-label="쪽 번호" inputmode="numeric">
+      <span id="pageTotal" class="info">/ -</span>
+      <button id="goPage" class="primary" type="button">열기</button>
+    </div>
+    <span id="pageInfo" class="info grow"></span>
+    <div class="tools"><button id="modePan" type="button" aria-pressed="true">이동·확대</button>
+    <button id="modeSel" type="button" aria-pressed="false">심벌 지정</button>
+    <button id="modeFix" type="button" aria-pressed="false">보정</button>
+    <button id="zin" type="button" aria-label="확대">＋</button>
+    <button id="zout" type="button" aria-label="축소">－</button>
+    <button id="zfit" type="button">전체</button></div>
+  </div>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="hint" id="hint">PDF를 열면 여기에 도면이 표시됩니다.</div>
+    </div>
+    <div class="side">
+      <div class="panel autop" id="autoPanel"></div>
+      <div id="manualPanels" class="manp">
+      <div class="panel">
+        <h2>직접 지정한 심벌</h2>
+        <div id="groups" class="empty">‘심벌 지정’을 누르고 도면의 심벌 하나를 네모로 드래그하면, 같은 모양을 찾아 개수를 세어 줍니다.</div>
+      </div>
+      <div class="panel">
+        <h2>수량 요약</h2>
+        <div class="tablewrap"><table class="sum" id="sum"></table></div>
+        <div class="g3" style="margin-top:8px"><button id="copyBtn" type="button">표 복사</button><button id="clearBtn" type="button">그룹 모두 지우기</button></div>
+        <p class="note" id="copyNote"></p>
+      </div>
+      <div class="panel">
+        <h2>인식 설정</h2>
+        <div class="g2">
+          <label class="exp">오차(pt) <input id="tol" type="number" step="0.05" min="0.02" max="1" value="0.15"></label>
+          <label class="exp">일치율(%) <input id="frac" type="number" step="5" min="50" max="100" value="90"></label>
+          <label class="exp"><input id="rot" type="checkbox" checked> 회전·좌우반전 포함</label>
+        </div>
+        <p class="note">오차는 선 위치가 얼마나 달라도 같은 심벌로 볼지, 일치율은 지정한 모양의 선이 몇 % 이상 있어야 하는지입니다.</p>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  </section>
+  <section class="view" id="v-kec" hidden></section>
+  <section class="view" id="v-gd" hidden></section>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var COLORS=['#d9480f','#1c7ed6','#2f9e44','#ae3ec9','#e8590c','#0b7285','#c2255c','#5c940d'];
+var S={pdf:null,file:null,pageNum:0,pw:1190,ph:842,segs:[],D:[],texts:[],grid:null,
+  view:{x:0,y:0,z:1},mode:'pan',groups:[],active:null,sel:null,loading:false,fitZ:1};
+var cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage');
+var dpr=Math.min(window.devicePixelRatio||1,3);
+var toastT=null;
+function toast(m,ms){var t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},ms||3200)}
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+
+/* ---------- PDF 열기 ---------- */
+function lib(){return window.pdfjsLib||window['pdfjs-dist/build/pdf']}
+function setStatus(m,bad){var s=$('status');s.textContent=m;s.className=bad?'bad':''}
+async function openPdf(file){
+  setStatus('선택한 파일: '+file.name+' ('+(file.size/1048576).toFixed(1)+'MB)');
+  if(!lib()){setStatus('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 페이지를 새로 열어 주세요.',true);toast('PDF 라이브러리를 불러오지 못했습니다.',5000);return}
+  S.loading=true;$('hint').textContent='PDF 여는 중…';setStatus('PDF 여는 중… ('+file.name+')');
+  var L=lib();
+  try{if(L.GlobalWorkerOptions&&!L.GlobalWorkerOptions.workerSrc)L.GlobalWorkerOptions.workerSrc=(window.__pdfWorker||'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js')}catch(e){}
+  try{
+    var len=file.size;
+    var first=new Uint8Array(await file.slice(0,Math.min(len,65536)).arrayBuffer());
+    var tr=new L.PDFDataRangeTransport(len,first);
+    tr.requestDataRange=function(b,e){file.slice(b,e).arrayBuffer().then(function(buf){tr.onDataRange(b,new Uint8Array(buf))})};
+    S.pdf=await L.getDocument({range:tr,disableAutoFetch:true,disableStream:true,rangeChunkSize:1<<20}).promise;
+  }catch(e1){
+    try{
+      $('hint').textContent='PDF 전체를 읽는 중…';
+      S.pdf=await L.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+    }catch(e2){S.loading=false;$('hint').textContent='PDF를 열 수 없습니다.';setStatus('PDF를 열 수 없습니다: '+(e2&&e2.message||e2),true);toast('PDF를 열 수 없습니다.',6000);return}
+  }
+  S.file=file;S.loading=false;setStatus('열었습니다: '+file.name+' · 총 '+S.pdf.numPages+'쪽');
+  $('pageTotal').textContent='/ '+S.pdf.numPages;$('pageNo').max=S.pdf.numPages;
+  toast('총 '+S.pdf.numPages+'쪽입니다. 쪽 번호를 입력해 열어 주세요.');
+  $('hint').textContent='쪽 번호를 입력하고 ‘열기’를 누르세요.';
+  scanAll().catch(function(e){setStatus('도면 분류에 실패했습니다: '+(e&&e.message||e),true)});
+}
+
+/* ---------- 쪽 추출 ---------- */
+function mul(a,b){return [a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]]}
+function ap(m,x,y){return [m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]}
+function parseColor(args){
+  if(!args||!args.length)return null;
+  var a=args[0],r,g,b;
+  if(typeof a==='string'){var h=a.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];r=parseInt(h.substr(0,2),16);g=parseInt(h.substr(2,2),16);b=parseInt(h.substr(4,2),16);return Math.max(r,g,b)<77}
+  if(args.length>=3){r=args[0];g=args[1];b=args[2];var m=Math.max(r,g,b);return (m>1?m/255:m)<0.3}
+  if(args.length===1&&typeof a==='number'){return (a>1?a/255:a)<0.3}
+  return null;
+}
+async function loadPage(n){
+  if(!S.pdf){toast('먼저 PDF를 열어 주세요.');return}
+  n=Math.max(1,Math.min(S.pdf.numPages,n|0));S.pageLoading=true;
+  $('hint').textContent=n+'쪽 분석 중… (큰 도면은 몇 초 걸립니다)';
+  await new Promise(function(r){setTimeout(r,30)});
+  var L=lib(),OPS=L.OPS;
+  var page=await S.pdf.getPage(n);
+  var vp=page.getViewport({scale:1});
+  var V=vp.transform;
+  var ol=await page.getOperatorList();
+  var fn=ol.fnArray,ar=ol.argsArray;
+  var ctm=[1,0,0,1,0,0],lw=1,dark=true,stack=[],cur=[];
+  var segs=[];
+  function full(){return mul(V,ctm)}
+  function sc(){var m=full();return Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]))}
+  function pushSeg(pts){cur.push(pts)}
+  function commit(){
+    var s=sc(),w=lw*s,dk=dark;
+    for(var i=0;i<cur.length;i++){segs.push({p:cur[i],lw:w,dk:dk})}
+    cur=[];
+  }
+  function readPath(ops,coords){ // 구버전 형식
+    var m=full(),ci=0,px=0,py=0,sx=0,sy=0,pt;
+    for(var i=0;i<ops.length;i++){
+      var o=ops[i];
+      if(o===OPS.moveTo){pt=ap(m,coords[ci],coords[ci+1]);ci+=2;px=pt[0];py=pt[1];sx=px;sy=py}
+      else if(o===OPS.lineTo){pt=ap(m,coords[ci],coords[ci+1]);ci+=2;pushSeg([px,py,pt[0],pt[1]]);px=pt[0];py=pt[1]}
+      else if(o===OPS.curveTo){var a=ap(m,coords[ci],coords[ci+1]),b=ap(m,coords[ci+2],coords[ci+3]),c=ap(m,coords[ci+4],coords[ci+5]);ci+=6;pushSeg([px,py,a[0],a[1],b[0],b[1],c[0],c[1]]);px=c[0];py=c[1]}
+      else if(o===OPS.curveTo2){var b2=ap(m,coords[ci],coords[ci+1]),c2=ap(m,coords[ci+2],coords[ci+3]);ci+=4;pushSeg([px,py,px,py,b2[0],b2[1],c2[0],c2[1]]);px=c2[0];py=c2[1]}
+      else if(o===OPS.curveTo3){var a3=ap(m,coords[ci],coords[ci+1]),c3=ap(m,coords[ci+2],coords[ci+3]);ci+=4;pushSeg([px,py,a3[0],a3[1],c3[0],c3[1],c3[0],c3[1]]);px=c3[0];py=c3[1]}
+      else if(o===OPS.closePath){if(px!==sx||py!==sy)pushSeg([px,py,sx,sy]);px=sx;py=sy}
+      else if(o===OPS.rectangle){
+        var x=coords[ci],y=coords[ci+1],w=coords[ci+2],h=coords[ci+3];ci+=4;
+        var p0=ap(m,x,y),p1=ap(m,x+w,y),p2=ap(m,x+w,y+h),p3=ap(m,x,y+h);
+        pushSeg([p0[0],p0[1],p1[0],p1[1]]);pushSeg([p1[0],p1[1],p2[0],p2[1]]);pushSeg([p2[0],p2[1],p3[0],p3[1]]);pushSeg([p3[0],p3[1],p0[0],p0[1]]);
+        px=p0[0];py=p0[1];sx=px;sy=py;
+      }
+    }
+  }
+  function readPathNew(d){ // 신버전 형식: [코드,좌표...]
+    var m=full(),i=0,px=0,py=0,sx=0,sy=0,pt;
+    while(i<d.length){
+      var o=d[i++];
+      if(o===0){pt=ap(m,d[i],d[i+1]);i+=2;px=pt[0];py=pt[1];sx=px;sy=py}
+      else if(o===1){pt=ap(m,d[i],d[i+1]);i+=2;pushSeg([px,py,pt[0],pt[1]]);px=pt[0];py=pt[1]}
+      else if(o===2){var a=ap(m,d[i],d[i+1]),b=ap(m,d[i+2],d[i+3]),c=ap(m,d[i+4],d[i+5]);i+=6;pushSeg([px,py,a[0],a[1],b[0],b[1],c[0],c[1]]);px=c[0];py=c[1]}
+      else if(o===3){var q=ap(m,d[i],d[i+1]),e=ap(m,d[i+2],d[i+3]);i+=4;pushSeg([px,py,q[0],q[1],q[0],q[1],e[0],e[1]]);px=e[0];py=e[1]}
+      else if(o===4){if(px!==sx||py!==sy)pushSeg([px,py,sx,sy]);px=sx;py=sy}
+      else break;
+    }
+  }
+  var strokeOps={};[OPS.stroke,OPS.closeStroke,OPS.fillStroke,OPS.eoFillStroke,OPS.closeFillStroke,OPS.closeEOFillStroke].forEach(function(o){strokeOps[o]=1});
+  for(var i=0;i<fn.length;i++){
+    var f=fn[i],a=ar[i];
+    if(f===OPS.save){stack.push([ctm,lw,dark])}
+    else if(f===OPS.restore){var st=stack.pop();if(st){ctm=st[0];lw=st[1];dark=st[2]}}
+    else if(f===OPS.transform){ctm=mul(ctm,a)}
+    else if(f===OPS.paintFormXObjectBegin){stack.push([ctm,lw,dark]);if(a&&a[0])ctm=mul(ctm,a[0])}
+    else if(f===OPS.paintFormXObjectEnd){var st2=stack.pop();if(st2){ctm=st2[0];lw=st2[1];dark=st2[2]}}
+    else if(f===OPS.setLineWidth){lw=a[0]}
+    else if(f===OPS.setGState){var g=a[0]||[];for(var k=0;k<g.length;k++){if(g[k][0]==='LW')lw=g[k][1]}}
+    else if(f===OPS.setStrokeRGBColor||f===OPS.setStrokeGray||f===OPS.setStrokeColor){var c=parseColor(a);if(c!==null)dark=c}
+    else if(f===OPS.setStrokeCMYKColor){dark=(a.length>=4)?(1-Math.min(1,(a[0]+a[3])))<0.3&&true:dark}
+    else if(f===OPS.constructPath){
+      if(typeof a[0]==='number'){ // 신버전: [그리기코드, [데이터], minMax]
+        var d=a[1][0]||a[1];readPathNew(d);
+        if(strokeOps[a[0]]||a[0]===OPS.stroke)commit();else cur=[];
+      }else{readPath(a[0],a[1])}
+    }
+    else if(strokeOps[f]){commit()}
+    else if(f===OPS.fill||f===OPS.eoFill||f===OPS.endPath||f===OPS.closeFillStroke&&false){cur=[]}
+  }
+  /* 글자 */
+  var texts=[];
+  try{
+    var tc=await page.getTextContent();
+    tc.items.forEach(function(it){
+      if(!it.str||!it.str.trim())return;
+      var m=mul(V,it.transform),size=Math.hypot(m[0],m[1]);
+      if(size<0.5)return;
+      texts.push({s:it.str,x:m[4],y:m[5],r:Math.atan2(m[1],m[0]),z:size,w:(it.width||0)});
+    });
+  }catch(e){}
+  /* 정리 */
+  S.pageNum=n;S.pw=vp.width;S.ph=vp.height;S.segs=segs;S.texts=texts;
+  buildDark();
+  var pn='';
+  var joined=texts.map(function(t){return t.s}).join(' ');
+  var mm=joined.match(/E\s*-\s*\d{3,4}/g);
+  if(mm)pn=mm[mm.length-1].replace(/\s+/g,'');
+  $('pageInfo').textContent=n+'쪽 '+(pn?'· '+pn+' ':'')+'· 선 '+segs.length.toLocaleString()+'개';
+  S.pageName=pn;
+  fitView();
+  /* 저장된 심벌을 이 쪽에 적용 */
+  S.groups=S.groups.filter(function(g){return !g.auto});S.auto={mode:null};
+  S.groups.forEach(function(g){g.manual=[];g.hits=findHits(g)});
+  renderGroups();draw();
+  $('hint').textContent=modeHint();
+  if($('pageSel'))$('pageSel').value=n;$('pageNo').value=n;
+  S.pageLoading=false;if(typeof fillPageSelect==='function'&&S.idx)fillPageSelect();setTimeout(function(){autoPage()},30);
+  if(!segs.length)toast('이 쪽에서 선을 읽지 못했습니다. 스캔본이거나 지원하지 않는 형식일 수 있습니다.',6000);
+}
+function buildDark(){
+  var D=[],g={};
+  S.segs.forEach(function(s){
+    if(!s.dk||s.lw<0.3)return;
+    var p=s.p,x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    for(var i=0;i<p.length;i+=2){if(p[i]<x0)x0=p[i];if(p[i]>x1)x1=p[i];if(p[i+1]<y0)y0=p[i+1];if(p[i+1]>y1)y1=p[i+1]}
+    s.cx=(x0+x1)/2;s.cy=(y0+y1)/2;s.w=x1-x0;s.h=y1-y0;s.bx0=x0;s.by0=y0;s.bx1=x1;s.by1=y1;
+    D.push(s);
+  });
+  var cell=0.5;
+  D.forEach(function(s){var k=Math.floor(s.cx/cell)*8192+Math.floor(s.cy/cell);(g[k]||(g[k]=[])).push(s)});
+  S.D=D;S.grid=g;S.cell=cell;
+}
+function near(cx,cy,w,h,tol){
+  var cell=S.cell,gx=Math.floor(cx/cell),gy=Math.floor(cy/cell),r=Math.ceil(tol/cell);
+  for(var a=gx-r;a<=gx+r;a++)for(var b=gy-r;b<=gy+r;b++){
+    var l=S.grid[a*8192+b];if(!l)continue;
+    for(var i=0;i<l.length;i++){var s=l[i];
+      if(Math.abs(s.cx-cx)<=tol&&Math.abs(s.cy-cy)<=tol&&Math.abs(s.w-w)<=tol&&Math.abs(s.h-h)<=tol)return true}
+  }
+  return false;
+}
+
+/* ---------- 심벌 찾기 ---------- */
+function sigOf(p){var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(var i=0;i<p.length;i+=2){if(p[i]<x0)x0=p[i];if(p[i]>x1)x1=p[i];if(p[i+1]<y0)y0=p[i+1];if(p[i+1]>y1)y1=p[i+1]}return {cx:(x0+x1)/2,cy:(y0+y1)/2,w:x1-x0,h:y1-y0}}
+function variants(g,all){
+  var out=[],seen={};
+  var list=all?[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1]]:[[0,0]];
+  list.forEach(function(v){
+    var sigs=g.tmpl.map(function(rel){
+      var q=[];
+      for(var i=0;i<rel.length;i+=2){
+        var x=rel[i],y=rel[i+1];
+        if(v[1])x=-x;
+        for(var r=0;r<v[0];r++){var t=x;x=-y;y=t}
+        q.push(x,y);
+      }
+      return sigOf(q);
+    });
+    var key=sigs.map(function(s){return [s.cx,s.cy,s.w,s.h].map(function(n){return n.toFixed(2)}).join(',')}).sort().join('|');
+    if(!seen[key]){seen[key]=1;out.push(sigs)}
+  });
+  return out;
+}
+function findHits(g){
+  var tol=parseFloat($('tol').value)||0.15,frac=(parseFloat($('frac').value)||90)/100,all=$('rot').checked;
+  var res=[];
+  variants(g,all).forEach(function(T){
+    var ai=0,best=-1;T.forEach(function(s,i){var v=s.w+s.h;if(v>best){best=v;ai=i}});
+    var a=T[ai];
+    for(var k=0;k<S.D.length;k++){
+      var s=S.D[k];
+      if(Math.abs(s.w-a.w)>tol||Math.abs(s.h-a.h)>tol)continue;
+      var dx=s.cx-a.cx,dy=s.cy-a.cy,ok=0;
+      for(var j=0;j<T.length;j++){if(near(T[j].cx+dx,T[j].cy+dy,T[j].w,T[j].h,tol))ok++}
+      if(ok/T.length>=frac)res.push({x:dx,y:dy,f:ok/T.length});
+    }
+  });
+  /* 중복 제거 */
+  res.sort(function(a,b){return b.f-a.f});
+  var thr=Math.max(0.6,0.35*Math.min(g.tw,g.th)),kept=[],cell=Math.max(thr,1),idx={};
+  res.forEach(function(h){
+    var gx=Math.floor(h.x/cell),gy=Math.floor(h.y/cell),dup=false;
+    for(var a=gx-1;a<=gx+1&&!dup;a++)for(var b=gy-1;b<=gy+1&&!dup;b++){
+      var l=idx[a+','+b];if(!l)continue;
+      for(var i=0;i<l.length;i++){if(Math.hypot(l[i].x-h.x,l[i].y-h.y)<thr){dup=true;break}}
+    }
+    if(!dup){kept.push(h);var key=gx+','+gy;(idx[key]||(idx[key]=[])).push(h)}
+  });
+  return kept.map(function(h){return {x:h.x,y:h.y,off:false}});
+}
+function addGroupFromBox(x0,y0,x1,y1,name){
+  var minx=Math.min(x0,x1),maxx=Math.max(x0,x1),miny=Math.min(y0,y1),maxy=Math.max(y0,y1);
+  var sel=S.D.filter(function(s){return s.bx0>=minx&&s.bx1<=maxx&&s.by0>=miny&&s.by1<=maxy});
+  if(!sel.length){toast('선택한 범위에 심벌 선이 없습니다. 심벌 전체가 네모 안에 들어오게 다시 지정해 주세요.');return null}
+  var X0=1e9,Y0=1e9,X1=-1e9,Y1=-1e9;
+  sel.forEach(function(s){X0=Math.min(X0,s.bx0);Y0=Math.min(Y0,s.by0);X1=Math.max(X1,s.bx1);Y1=Math.max(Y1,s.by1)});
+  var cx=(X0+X1)/2,cy=(Y0+Y1)/2;
+  var tmpl=sel.map(function(s){var r=[];for(var i=0;i<s.p.length;i+=2){r.push(s.p[i]-cx,s.p[i+1]-cy)}return r});
+  var n=S.groups.length+1;
+  var g={id:Date.now()+Math.floor(Math.random()*1000),name:name||('심벌 '+n),color:COLORS[(n-1)%COLORS.length],expected:'',
+    tmpl:tmpl,cx:cx,cy:cy,tw:X1-X0,th:Y1-Y0,hits:[],manual:[],show:true};
+  g.hits=findHits(g);
+  S.groups.push(g);S.active=g.id;saveGroups();renderGroups();draw();
+  if(sel.length<3)toast('선택한 선이 '+sel.length+'개뿐이라 다른 도형이 섞여 잡힐 수 있습니다. 심벌 전체를 포함해 주세요.',5200);
+  return g;
+}
+function count(g){var c=g.manual.length;g.hits.forEach(function(h){if(!h.off)c++});return c}
+
+/* ---------- 그룹 화면 ---------- */
+function renderGroups(){
+  var box=$('groups');
+  if(!S.groups.length){box.className='empty';box.textContent='‘심벌 지정’을 누르고 도면의 심벌 하나를 네모로 드래그하면, 같은 모양을 찾아 개수를 세어 줍니다.';renderSum();return}
+  box.className='';box.innerHTML='';
+  S.groups.forEach(function(g){
+    var c=count(g),d=document.createElement('div');d.className='group'+(g.id===S.active?' active':'');
+    var st='';
+    if(g.expected!==''&&!isNaN(parseFloat(g.expected))){var diff=c-parseFloat(g.expected);st=diff===0?'<span class="pill ok">도면 표기와 일치</span>':'<span class="pill '+(Math.abs(diff)<=2?'warn':'bad')+'">차이 '+(diff>0?'+':'')+diff+'</span>'}
+    d.innerHTML='<div class="g1"><span class="sw" style="background:'+g.color+'"></span><input type="text" data-k="name" value="'+esc(g.name)+'" aria-label="그룹 이름"></div>'+
+      '<div class="g2"><div class="cnt">'+c+'<small> 개</small></div>'+
+      '<label class="exp">도면 표기 <input type="number" data-k="exp" value="'+esc(g.expected)+'" inputmode="numeric" placeholder="수량"></label>'+st+'</div>'+
+      '<div class="g3"><button type="button" data-a="sel">선택</button><button type="button" data-a="show">'+(g.show?'표시 끄기':'표시 켜기')+'</button><button type="button" data-a="go">위치 보기</button><button type="button" data-a="del">삭제</button></div>'+
+      '<div class="note">'+(g.tmpl.length)+'개 선으로 이루어진 모양 · 보정 '+(g.hits.filter(function(h){return h.off}).length?'제외 '+g.hits.filter(function(h){return h.off}).length+'개 ':'')+(g.manual.length?'추가 '+g.manual.length+'개':'')+'</div>';
+    d.addEventListener('click',function(e){
+      var t=e.target;
+      if(t.dataset&&t.dataset.a==='del'){S.groups=S.groups.filter(function(x){return x!==g});if(S.active===g.id)S.active=S.groups.length?S.groups[0].id:null;saveGroups()}
+      else if(t.dataset&&t.dataset.a==='show'){g.show=!g.show}
+      else if(t.dataset&&t.dataset.a==='go'){var h=g.hits.find(function(x){return !x.off});if(h){S.view.z=Math.max(S.view.z,10);centerOn(h.x,h.y)}}
+      else if(t.dataset&&t.dataset.a==='sel'){S.active=g.id}
+      else if(t.tagName==='INPUT')return;
+      else S.active=g.id;
+      renderGroups();draw();
+    });
+    d.querySelector('[data-k=name]').addEventListener('input',function(e){g.name=e.target.value;saveGroups();renderSum()});
+    d.querySelector('[data-k=exp]').addEventListener('change',function(e){g.expected=e.target.value;renderGroups()});
+    box.appendChild(d);
+  });
+  renderSum();
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function renderSum(){
+  var t=$('sum');
+  if(!S.groups.length){t.innerHTML='<tr><td class="empty">아직 지정한 심벌이 없습니다.</td></tr>';return}
+  var h='<tr><th>이름</th><th class="n">찾음</th><th class="n">표기</th><th class="n">차이</th></tr>';
+  S.groups.forEach(function(g){
+    var c=count(g),e=g.expected!==''?parseFloat(g.expected):NaN;
+    h+='<tr><td>'+esc(g.name)+'</td><td class="n">'+c+'</td><td class="n">'+(isNaN(e)?'-':e)+'</td><td class="n">'+(isNaN(e)?'-':(c-e>0?'+':'')+(c-e))+'</td></tr>';
+  });
+  t.innerHTML=h;
+}
+function saveGroups(){
+  try{localStorage.setItem('dm-groups-v1',JSON.stringify(S.groups.filter(function(g){return !g.auto}).map(function(g){return {name:g.name,color:g.color,tmpl:g.tmpl,cx:g.cx,cy:g.cy,tw:g.tw,th:g.th}})))}catch(e){}
+}
+function loadGroups(){
+  try{
+    var raw=localStorage.getItem('dm-groups-v1');if(!raw)return;
+    JSON.parse(raw).forEach(function(o,i){S.groups.push({id:Date.now()+i,name:o.name,color:o.color,expected:'',tmpl:o.tmpl,cx:o.cx,cy:o.cy,tw:o.tw,th:o.th,hits:[],manual:[],show:true})});
+    if(S.groups.length)S.active=S.groups[0].id;
+  }catch(e){}
+}
+
+/* ---------- 그리기 ---------- */
+var raf=0;
+function draw(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;paint()})}
+function resize(){
+  var r=stage.getBoundingClientRect();
+  cv.width=Math.max(10,Math.round(r.width*dpr));cv.height=Math.max(10,Math.round(r.height*dpr));
+}
+function paint(){
+  var W=cv.width,H=cv.height;
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=css('--canvas');ctx.fillRect(0,0,W,H);
+  var v=S.view,k=v.z*dpr;
+  ctx.setTransform(k,0,0,k,-v.x*k,-v.y*k);
+  /* 용지 */
+  ctx.strokeStyle=css('--seg2');ctx.lineWidth=1/k;ctx.strokeRect(0,0,S.pw,S.ph);
+  var x0=v.x,y0=v.y,x1=v.x+W/k,y1=v.y+H/k;
+  /* 선: 회색과 검정을 각각 한 번에 */
+  var seg=css('--seg'),seg2=css('--seg2'),minw=1/k;
+  [[false,seg2],[true,seg]].forEach(function(pass){
+    ctx.beginPath();
+    for(var i=0;i<S.segs.length;i++){
+      var s=S.segs[i];if(s.dk!==pass[0])continue;
+      var p=s.p,n=p.length;
+      var bx0=Math.min(p[0],p[n-2]),bx1=Math.max(p[0],p[n-2]),by0=Math.min(p[1],p[n-1]),by1=Math.max(p[1],p[n-1]);
+      if(bx1<x0-5||bx0>x1+5||by1<y0-5||by0>y1+5)continue;
+      ctx.moveTo(p[0],p[1]);
+      if(n===4)ctx.lineTo(p[2],p[3]);else ctx.bezierCurveTo(p[2],p[3],p[4],p[5],p[6],p[7]);
+    }
+    ctx.strokeStyle=pass[1];ctx.lineWidth=pass[0]?Math.max(0.35,minw):Math.max(0.15,minw);ctx.stroke();
+  });
+  /* 글자 */
+  if(v.z>=1.6){
+    ctx.fillStyle=css('--muted');
+    for(var t=0;t<S.texts.length;t++){
+      var T=S.texts[t];if(T.x<x0-80||T.x>x1+80||T.y<y0-80||T.y>y1+80)continue;
+      if(T.z*v.z<5)continue;
+      ctx.save();ctx.translate(T.x,T.y);ctx.rotate(T.r);ctx.font=T.z+'px sans-serif';ctx.fillText(T.s,0,0);ctx.restore();
+    }
+  }
+  /* 표시 */
+  S.groups.forEach(function(g){
+    if(!g.show)return;
+    var R=Math.max(g.tw,g.th)*0.5+1.4,act=g.id===S.active;
+    g.hits.forEach(function(h){
+      ctx.beginPath();ctx.arc(h.x,h.y,R,0,6.2832);
+      if(h.off){ctx.setLineDash([2/k*3,2/k*3]);ctx.strokeStyle=css('--muted');ctx.lineWidth=Math.max(0.5,1.5/k)}
+      else{ctx.setLineDash([]);ctx.strokeStyle=g.color;ctx.lineWidth=Math.max(act?1.0:0.7,(act?2.4:1.8)/k)}
+      ctx.stroke();ctx.setLineDash([]);
+    });
+    g.manual.forEach(function(h){
+      ctx.beginPath();ctx.rect(h.x-R,h.y-R,2*R,2*R);ctx.strokeStyle=g.color;ctx.lineWidth=Math.max(0.7,2/k);ctx.stroke();
+    });
+  });
+  paintAuto(ctx,k);
+  /* 지정 중인 네모 */
+  if(S.sel){
+    var q=S.sel;ctx.setLineDash([4/k*3,3/k*3]);ctx.strokeStyle=css('--accent');ctx.lineWidth=Math.max(0.4,1.6/k);
+    ctx.strokeRect(Math.min(q.x0,q.x1),Math.min(q.y0,q.y1),Math.abs(q.x1-q.x0),Math.abs(q.y1-q.y0));ctx.setLineDash([]);
+  }
+}
+function fitView(){
+  var r=stage.getBoundingClientRect();
+  var z=Math.min(r.width/S.pw,r.height/S.ph);S.fitZ=z;
+  S.view={z:z,x:-(r.width/z-S.pw)/2,y:-(r.height/z-S.ph)/2};
+}
+function centerOn(x,y){var r=stage.getBoundingClientRect();S.view.x=x-r.width/2/S.view.z;S.view.y=y-r.height/2/S.view.z;draw()}
+function zoomAt(f,sx,sy){
+  var v=S.view,nz=Math.max(S.fitZ*0.8,Math.min(60,v.z*f));
+  var px=v.x+sx/v.z,py=v.y+sy/v.z;
+  v.z=nz;v.x=px-sx/nz;v.y=py-sy/nz;draw();
+}
+
+/* ---------- 조작 ---------- */
+function setMode(m){
+  S.mode=m;
+  [['pan','modePan'],['sel','modeSel'],['fix','modeFix']].forEach(function(a){$(a[1]).setAttribute('aria-pressed',a[0]===m?'true':'false')});
+  $('hint').textContent=modeHint();
+}
+function modeHint(){
+  if(!S.segs.length)return S.pdf?'쪽 번호를 입력하고 ‘열기’를 누르세요.':'PDF를 열면 여기에 도면이 표시됩니다.';
+  return S.mode==='pan'?'한 손가락으로 이동, 두 손가락으로 확대·축소 (PC는 휠).':
+    S.mode==='sel'?'확대한 뒤, 심벌 하나가 완전히 들어오게 네모로 드래그하세요.':
+    '동그라미를 누르면 제외/복구, 빈 곳을 누르면 선택한 그룹에 직접 추가됩니다.';
+}
+var ptrs={},pinch=null,drag=null;
+function pos(e){var r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}}
+function toPage(p){return {x:S.view.x+p.x/S.view.z,y:S.view.y+p.y/S.view.z}}
+cv.addEventListener('pointerdown',function(e){
+  cv.setPointerCapture(e.pointerId);ptrs[e.pointerId]=pos(e);
+  var ids=Object.keys(ptrs);
+  if(ids.length===2){
+    var a=ptrs[ids[0]],b=ptrs[ids[1]];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:S.view.z};drag=null;S.sel=null;
+  }else{
+    var p=pos(e);drag={sx:p.x,sy:p.y,vx:S.view.x,vy:S.view.y,moved:false,start:toPage(p)};
+    if(S.mode==='sel'&&S.segs.length){S.sel={x0:drag.start.x,y0:drag.start.y,x1:drag.start.x,y1:drag.start.y}}
+  }
+});
+cv.addEventListener('pointermove',function(e){
+  if(!ptrs[e.pointerId])return;ptrs[e.pointerId]=pos(e);
+  var ids=Object.keys(ptrs);
+  if(ids.length===2&&pinch){
+    var a=ptrs[ids[0]],b=ptrs[ids[1]],d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    var target=pinch.z*d/pinch.d;zoomAt(target/S.view.z,mx,my);return;
+  }
+  if(!drag)return;var p=pos(e);
+  if(Math.hypot(p.x-drag.sx,p.y-drag.sy)>4)drag.moved=true;
+  if(S.mode==='sel'&&S.sel){var q=toPage(p);S.sel.x1=q.x;S.sel.y1=q.y;draw()}
+  else if(drag.moved){S.view.x=drag.vx-(p.x-drag.sx)/S.view.z;S.view.y=drag.vy-(p.y-drag.sy)/S.view.z;draw()}
+});
+function endPtr(e){
+  var had=ptrs[e.pointerId];delete ptrs[e.pointerId];
+  if(Object.keys(ptrs).length<2)pinch=null;
+  if(!had||!drag)return;
+  var d=drag;drag=null;
+  if(S.mode==='sel'&&S.sel){
+    var q=S.sel;S.sel=null;
+    if(Math.abs(q.x1-q.x0)*S.view.z>8&&Math.abs(q.y1-q.y0)*S.view.z>8){if(S.assign)assignFromBox(q.x0,q.y0,q.x1,q.y1);else addGroupFromBox(q.x0,q.y0,q.x1,q.y1)}
+    else toast('네모를 조금 더 크게 드래그해 주세요.');
+    draw();
+  }else if(S.mode==='fix'&&!d.moved&&S.segs.length){
+    var pt=d.start,done=false;
+    S.groups.forEach(function(g){
+      if(done||!g.show)return;var R=Math.max(g.tw,g.th)*0.5+1.4;
+      for(var i=0;i<g.manual.length;i++){if(Math.hypot(g.manual[i].x-pt.x,g.manual[i].y-pt.y)<=R){g.manual.splice(i,1);done=true;return}}
+      for(var j=0;j<g.hits.length;j++){var h=g.hits[j];if(Math.hypot(h.x-pt.x,h.y-pt.y)<=R){h.off=!h.off;done=true;S.active=g.id;return}}
+    });
+    if(!done){var ag=S.groups.find(function(g){return g.id===S.active});if(ag){ag.manual.push({x:pt.x,y:pt.y})}else toast('먼저 그룹을 선택해 주세요.')}
+    renderGroups();draw();
+  }
+}
+cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('wheel',function(e){e.preventDefault();var p=pos(e);zoomAt(e.deltaY<0?1.25:0.8,p.x,p.y)},{passive:false});
+
+$('pdfFile').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];if(f)openPdf(f)});
+$('goPage').addEventListener('click',function(){loadPage(parseInt($('pageNo').value,10)||1)});
+$('pageNo').addEventListener('keydown',function(e){if(e.key==='Enter')loadPage(parseInt($('pageNo').value,10)||1)});
+$('modePan').addEventListener('click',function(){setMode('pan')});
+$('modeSel').addEventListener('click',function(){setMode('sel')});
+$('modeFix').addEventListener('click',function(){setMode('fix')});
+$('zin').addEventListener('click',function(){var r=stage.getBoundingClientRect();zoomAt(1.6,r.width/2,r.height/2)});
+$('zout').addEventListener('click',function(){var r=stage.getBoundingClientRect();zoomAt(1/1.6,r.width/2,r.height/2)});
+$('zfit').addEventListener('click',function(){fitView();draw()});
+['tol','frac','rot'].forEach(function(id){$(id).addEventListener('change',function(){S.groups.forEach(function(g){g.hits=findHits(g)});renderGroups();draw()})});
+$('clearBtn').addEventListener('click',function(){S.groups=[];S.active=null;saveGroups();renderGroups();draw()});
+$('copyBtn').addEventListener('click',function(){
+  var rows=[['쪽','도면번호','이름','찾은 수','도면 표기','차이']];
+  S.groups.forEach(function(g){var c=count(g),e=g.expected!==''?parseFloat(g.expected):'';rows.push([S.pageNum,S.pageName||'',g.name,c,e,e===''?'':c-e])});
+  var txt=rows.map(function(r){return r.join('\t')}).join('\n');
+  function fb(){var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');$('copyNote').textContent='복사했습니다. 엑셀에 붙여넣으세요.'}catch(e){$('copyNote').textContent='복사하지 못했습니다. 아래 내용을 직접 선택해 복사해 주세요.'}document.body.removeChild(ta)}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){$('copyNote').textContent='복사했습니다. 엑셀에 붙여넣으세요.'},fb)}else fb();
+});
+window.addEventListener('resize',function(){resize();draw()});
+if(window.ResizeObserver)new ResizeObserver(function(){resize();draw()}).observe(stage);
+
+/*AN-START*/
+/* ===== 도면 분석기: 글자(좌표 포함)만 사용, 브라우저 안에서 동작 ===== */
+var STD_AT=[10,15,16,20,25,30,32,40,50,60,63,75,80,100,125,150,160,175,200,225,250,300,315,350,400,500,600,630,700,800,1000,1200,1250,1600,2000,2500,3200,4000];
+var STD_AF=[30,32,50,60,63,100,125,160,200,225,250,300,400,500,600,630,800,1000,1250,1600,2000,2500,3200,4000];
+/* 구리 도체 가교폴리에틸렌(XLPE) 절연, 3부하도체, 30℃ 기준 허용전류(A) — IEC 60364-5-52 계열 값. 기본값이며 설정에서 고칠 수 있다. */
+var AMP_E={1.5:26,2.5:36,4:49,6:63,10:86,16:115,25:149,35:185,50:225,70:289,95:352,120:410,150:473,185:542,240:641,300:741};
+var AMP_F={25:161,35:200,50:242,70:310,95:377,120:437,150:504,185:575,240:679,300:783};
+/* 완성품 바깥지름(mm) 근사값 — 0.6/1kV CV·F-CV, GV(F-GV), HFIX. 제조사 카탈로그로 확인 후 설정에서 고친다. */
+var OD_DEF={
+ CV1:{2.5:7,4:7.5,6:8,10:9,16:10.5,25:12.5,35:13.5,50:15.5,70:17.5,95:20,120:21.5,150:24,185:26.5,240:30,300:33},
+ CV2:{2.5:11,4:12,6:13,10:15,16:17,25:20,35:22},
+ CV3:{2.5:11.5,4:12.5,6:14,10:16,16:18.5,25:22,35:25,50:28,70:32,95:36},
+ CV4:{2.5:12.5,4:14,6:15,10:17.5,16:20,25:24,35:26.5,50:31,70:35,95:40,120:44,150:49},
+ GV:{2.5:4,4:4.6,6:5.2,10:6.7,16:7.8,25:9.7,35:11,50:13,70:15,95:17,120:19,150:21,185:23.5,240:26.5},
+ HFIX:{1.5:3.3,2.5:3.9,4:4.5,6:5.1,10:6.5,16:7.6,25:9.5,35:10.9}
+};
+function odDefault(){return JSON.parse(JSON.stringify(OD_DEF))}
+/* 한 줄(배관 1개)에 들어가는 전선 목록: [{kind,size,n}] */
+function cableSet(c){
+  if(!c||!c.size)return [];
+  var out=[];
+  if(c.wire)out.push({kind:/GV/.test(c.type)?'GV':'HFIX',size:c.size,n:c.lines||1});
+  else out.push({kind:c.core===1?'CV1':'CV'+Math.min(4,Math.max(2,c.core)),size:c.size,n:c.lines||1});
+  if(c.pe)out.push({kind:c.peType||'GV',size:c.pe,n:1});
+  return out;
+}
+function odOf(tbl,kind,size){var t=tbl&&tbl[kind];return t&&t[size]!=null?parseFloat(t[size]):null}
+function amDefault(){return {E:JSON.parse(JSON.stringify(AMP_E)),F:JSON.parse(JSON.stringify(AMP_F))}}
+function iz(size,core,tbl){
+  var t=(core===1?tbl.F:tbl.E)||{},v=t[size];
+  if(v==null&&core===1)v=(tbl.E||{})[size];
+  return v==null?null:v;
+}
+/* KEC 142.3.2 보호도체 최소 단면적(구리): S≤16 → S, 16<S≤35 → 16, S>35 → S/2 */
+function peMin(S){return S<=16?S:(S<=35?16:S/2)}
+function panelKey(s){
+  return String(s||'').toUpperCase().replace(/\(.*?\)/g,'').replace(/PNL/g,'').replace(/\s+/g,'').replace(/[,.;:]+$/,'');
+}
+function isNum(t){return /^\d{1,3}$/.test(t)}
+/* ---- 표제란 번호 (오른쪽 아래) ---- */
+function findSheetNo(items,w,h){
+  var kx=1190.55/w,ky=841.89/h,best=null;
+  items.forEach(function(it){
+    var t=(it.str||'').trim();if(!/^E\s*-\s*\d{3,4}$/.test(t))return;
+    var x=it.transform[4]*kx,y=it.transform[5]*ky;
+    if(x>860&&y<170&&(!best||y<best.y))best={no:parseInt(t.replace(/\D/g,''),10),y:y};
+  });
+  return best?best.no:0;
+}
+/* ---- 케이블 스케줄 ---- */
+var CABLE_RE=/([A-Z][A-Z0-9\-]*)?\s*(\d+)\s*C\s*[\/ ]?\s*(\d+(?:\.\d+)?)\s*(?:㎟|sq|SQ|mm2|mm²)\s*(?:[-x×]\s*(\d+))?/;
+function parseCable(txt){
+  var t=String(txt).replace(/\s+/g,' '),m=t.match(CABLE_RE),o=null;
+  if(m)o={type:(m[1]||'').trim(),core:parseInt(m[2],10),size:parseFloat(m[3]),lines:m[4]?parseInt(m[4],10):1,pe:null,peType:'GV',raw:t};
+  else{ /* 단심 절연전선: HFIX 4sq-2, IV 2.5㎟×3 */
+    var w=t.match(/\b(HFIX|HF-IX|HIV|IV|FR-?8|F-?GV|GV)\s*(\d+(?:\.\d+)?)\s*(?:㎟|sq|SQ|mm2)\s*[-x×]\s*(\d+)/);
+    if(w)o={type:w[1].replace('-',''),core:1,size:parseFloat(w[2]),lines:parseInt(w[3],10),pe:null,peType:'GV',wire:true,raw:t};
+  }
+  if(!o)return null;
+  var e=t.match(/E\s*\/\s*(F-?GV|GV|HFIX|IV)\s*(\d+(?:\.\d+)?)\s*(?:㎟|sq|SQ|mm2)/)||t.match(/,\s*(F-?GV|GV)\s*(\d+(?:\.\d+)?)\s*(?:㎟|sq|SQ|mm2)/);
+  if(e){o.pe=parseFloat(e[2]);o.peType=/HFIX/.test(e[1])?'HFIX':(/IV/.test(e[1])?'HFIX':'GV')}
+  return o;
+}
+/* 배관 표기: "CABLE TRAY/E 51C", "ELP 125C", "금속재 방수 FX 42C", "ELP 50D" */
+function parseConduit(t){
+  var s=String(t||''),re=/(ELP|CD|HI-?PVC|HI|PF|FX|ST|STS|GI|PE|E|C)?\s*[\/ ]?\s*(\d{2,3})\s*[CD]\b/g,m,last=null;
+  while((m=re.exec(s))){last=m;break}
+  if(!last)return null;
+  return {type:(last[1]||'').replace('-',''),size:parseInt(last[2],10),tray:/TRAY/i.test(s),raw:s.trim()};
+}
+/* 트레이 규격: "CABLE TRAY 500*100" */
+function findTrays(items){
+  var out=[];
+  items.forEach(function(it){var m=String(it.str||'').match(/TRAY\s*\(?\s*(\d{2,4})\s*[*xX×]\s*(\d{2,3})/i);if(m)out.push(parseInt(m[1],10)+'×'+parseInt(m[2],10))});
+  return out;
+}
+function parseSchedule(items,w,h){
+  var kx=1190.55/w,ky=841.89/h,A=[];
+  items.forEach(function(it){var t=(it.str||'').trim();if(t)A.push({t:t,x:it.transform[4]*kx,y:it.transform[5]*ky})});
+  var hasHead=A.some(function(a){return /CABLE\s*SCHEDULE/i.test(a.t)});
+  if(!hasHead)return null;
+  var specRe=/㎟|sq\b|SQ\b|sq-|UTP|예비공배관|CNCV/;
+  var nums=A.filter(function(a){
+    if(!isNum(a.t))return false;
+    return A.some(function(d){return d!==a&&Math.abs(d.y-a.y)<4&&d.x>a.x+8&&d.x<a.x+45&&specRe.test(d.t)});
+  });
+  if(!nums.length)return null;
+  var cols=[];nums.forEach(function(n){var f=cols.some(function(c){return Math.abs(c-n.x)<8});if(!f)cols.push(n.x)});
+  cols.sort(function(a,b){return a-b});
+  var rows=nums.map(function(n){return {no:parseInt(n.t,10),x:n.x,y:n.y,items:[]}});
+  A.forEach(function(a){
+    if(nums.indexOf(a)>=0)return;
+    var cx=null;cols.forEach(function(c){if(a.x>=c-2)cx=c});
+    if(cx===null)return;
+    var nxt=cols.filter(function(c){return c>cx})[0];if(nxt!=null&&a.x>=nxt-2)return;
+    if(a.x-cx>330)return;
+    var best=null,bd=1e9;
+    rows.forEach(function(r){if(Math.abs(r.x-cx)>8)return;var d=Math.abs(r.y-a.y);if(d<bd){bd=d;best=r}});
+    if(best&&bd<=6.2)best.items.push({t:a.t,rel:a.x-cx,y:a.y});
+  });
+  var out=[];
+  rows.sort(function(a,b){return a.no-b.no});
+  rows.forEach(function(r){
+    r.items.sort(function(a,b){return b.y-a.y>2?1:(a.y-b.y>2?-1:a.rel-b.rel)});
+    var cab=null,cabTxt='',tray='',from=[],to=[],rest=[];
+    r.items.forEach(function(i){
+      if(!cab&&specRe.test(i.t)){cabTxt=i.t;cab=parseCable(i.t);if(!cab&&/예비|UTP/.test(i.t))cab={type:'-',core:0,size:0,lines:0,pe:null,raw:i.t}}
+      else if(/TRAY|^ELP|^CD|^ST|^FX|^E\s*\d/.test(i.t)||/\d+\s*[CD]\b/.test(i.t)&&/ELP|CD|FX|ST|TRAY/.test(i.t))tray+=(tray?' ':'')+i.t;
+      else if(i.rel>=140&&i.rel<182)from.push(i.t);
+      else if(i.rel>=182&&i.rel<232)to.push(i.t);
+      else rest.push(i.t);
+    });
+    out.push({no:r.no,cable:cab,cableTxt:cabTxt,tray:tray,from:from.join(' ').trim(),to:to.join(' ').trim(),note:rest.join(' '),complete:!!(cab&&from.length&&to.length)});
+  });
+  return out;
+}
+/* ---- 분전반 결선도 ---- */
+var BRK_RE=/(?:(MCCB|MCB|RCBO|CBR|ELCB|ELB|ACB|VCB)\s*)?(?:([1-4])\s*P\s*)?(\d{2,4})\s*(?:AF)?\s*\/\s*(\d{1,4})\s*AT/;
+function parseBreaker(t){
+  var m=String(t).replace(/\s+/g,' ').match(BRK_RE);
+  if(!m)return null;
+  return {type:m[1]||'',poles:m[2]?parseInt(m[2],10):0,af:parseInt(m[3],10),at:parseInt(m[4],10)};
+}
+function parsePanels(items,w,h){
+  var kx=1190.55/w,ky=841.89/h,A=[];
+  items.forEach(function(it){var t=(it.str||'').trim();if(t)A.push({t:t,x:it.transform[4]*kx,y:it.transform[5]*ky})});
+  if(!A.some(function(a){return /설치위치/.test(a.t)}))return [];
+  var heads=A.filter(function(a){return a.y>755&&!/설치위치|AC\s*\d{3}|^[123]\s*[ØΦ]|^L\d|^NOTE|^WHM|^MCCB|^MCB|^\d/.test(a.t)&&/^[A-Z][A-Z0-9\-\/~ ]*(\s*\(.+\))?$/.test(a.t)&&a.t.length<40});
+  heads.sort(function(a,b){return a.x-b.x});
+  if(!heads.length)return [];
+  var bounds=heads.map(function(hd,i){return {lo:i===0?-1:hd.x-30,hi:i===heads.length-1?1e9:heads[i+1].x-30,name:hd.t}});
+  var out=[];
+  bounds.forEach(function(b){
+    var R=A.filter(function(a){return a.x>=b.lo&&a.x<b.hi&&a.y<770});
+    var head=A.filter(function(a){return a.x>=b.lo&&a.x<b.hi&&a.y>=750});
+    var p={name:b.name.replace(/\s*\(.*\)\s*$/,'').replace(/\s+/g,''),label:b.name,loc:'',from:'',phase:'',main:null,br:[],sp:0,x0:b.lo};
+    head.forEach(function(a){var m=a.t.match(/설치위치\s*:?\s*(.*)/);if(m)p.loc=m[1].trim()});
+    R.forEach(function(a){
+      var m=a.t.match(/FROM\s*TO\s*:?\s*(.*)/);if(m&&!p.from)p.from=panelKey(m[1]);
+      if(/3\s*[ØΦ]\s*4\s*W/.test(a.t))p.phase='3Ø4W';else if(/1\s*[ØΦ]\s*2\s*W/.test(a.t)&&!p.phase)p.phase='1Φ2W';
+    });
+    /* 차단기 */
+    var brs=[];
+    R.forEach(function(a){
+      var bk=parseBreaker(a.t);
+      if(bk){
+        if(!bk.type){ /* 바로 위 글자에서 종류 찾기 */
+          var up=null,ud=1e9;
+          R.forEach(function(u){if(u===a)return;var dy=u.y-a.y,dx=Math.abs(u.x-a.x);
+            if(dy>0&&dy<16&&dx<14&&/^(MCCB|MCB|RCBO|CBR|ELCB|ELB|ACB)\b/.test(u.t)){var d=dy+dx;if(d<ud){ud=d;up=u}}});
+          if(up){var m2=up.t.match(/^(MCCB|MCB|RCBO|CBR|ELCB|ELB|ACB)\s*([1-4])?\s*P?/);bk.type=m2[1];if(m2[2])bk.poles=parseInt(m2[2],10)}
+        }
+        bk.x=a.x;bk.y=a.y;bk.raw=a.t;brs.push(bk);
+      }
+    });
+    /* 이름 후보 */
+    var names=R.filter(function(a){
+      if(parseBreaker(a.t)||/^(MCCB|MCB|RCBO|CBR|ELCB|ELB|ACB)\b/.test(a.t)||/^\d|원격검침|외형도|조작전원|트립|^TO:|^FROM/.test(a.t))return false;
+      return /\((전등|전열|예비|동력|난방|냉방|냉난방|조명|비상|공조|급수|배수|승강|설비|기타|[^)]*)\)\s*$/.test(a.t)||/^(SP|ET|NT)\b/.test(a.t)||/^[A-Z]{1,4}\d{0,2}(-\d)?\s*\(/.test(a.t);
+    }).map(function(a){return {t:a.t,x:a.x,y:a.y,used:false}});
+    var pairs=[];
+    brs.forEach(function(bk,bi){names.forEach(function(n,ni){var dx=Math.abs(n.x-bk.x),dy=Math.abs(n.y-bk.y);if(dx<=60&&dy<=48)pairs.push({bi:bi,ni:ni,d:dx+dy*2.2})})});
+    pairs.sort(function(a,b){return a.d-b.d});
+    pairs.forEach(function(pr){var bk=brs[pr.bi],n=names[pr.ni];if(bk.name||n.used)return;bk.name=n.t;n.used=true});
+    /* 인입(주) 차단기: FROM 아래에서 가장 가까운 것 */
+    var fromItem=R.filter(function(a){return /FROM\s*TO/.test(a.t)})[0];
+    var mainIdx=-1;
+    if(brs.length){
+      var cand=brs.map(function(bk,i){return {i:i,bk:bk}}).filter(function(o){return !o.bk.name||/MCB|MCCB|ACB/.test(o.bk.type)});
+      var ref=fromItem?fromItem.y:780,bd=1e9;
+      brs.forEach(function(bk,i){
+        var dy=ref-bk.y;if(dy<-5)return;
+        var dx=fromItem?Math.abs(bk.x-fromItem.x):0;
+        var d=dy+dx*0.6;if(d<bd&&!bk.name){bd=d;mainIdx=i}
+      });
+    }
+    if(!fromItem&&brs.length){var mx=-1;brs.forEach(function(bk,i){if(bk.at>mx&&!/^(RCBO|CBR|ELCB|ELB)$/.test(bk.type)){mx=bk.at;mainIdx=i}})}
+    brs.forEach(function(bk,i){if(i===mainIdx)p.main=bk;else p.br.push(bk)});
+    p.br.sort(function(a,b){return b.y-a.y>10?1:(a.y-b.y>10?-1:a.x-b.x)});
+    p.sp=p.br.filter(function(b){return /예비|^SP/.test(b.name||'')}).length;
+    if(p.br.length+(p.main?1:0)>=3)out.push(p);
+  });
+  return out;
+}
+/* ---- 수전 방식(수변전 도면) ---- */
+function parseSupply(items){
+  var o={kv:0,kva:0,tr:[],kvs:{}};
+  items.forEach(function(it){
+    var t=String(it.str||'');
+    var m=t.match(/(\d{1,3}(?:\.\d+)?)\s*kV\b/i);if(m&&parseFloat(m[1])>=3&&parseFloat(m[1])<100){var kk=parseFloat(m[1]);o.kvs[kk]=(o.kvs[kk]||0)+1}
+    var k=t.match(/\b(\d{2,5})\s*kVA/i);if(k&&/(3\s*[ØΦ]|TR|변압)/.test(t))o.tr.push(parseInt(k[1],10));
+  });
+  items.forEach(function(it){var k=String(it.str||'').match(/^(\d{3,5})\s*kVA$/i);if(k)o.tr.push(parseInt(k[1],10))});
+  o.kva=o.tr.length?Math.max.apply(null,o.tr):0;
+  var bk=0;for(var k2 in o.kvs){if(o.kvs[k2]>bk){bk=o.kvs[k2];o.kv=parseFloat(k2)}}
+  if(o.kvs[22.9])o.kv=22.9;
+  return o;
+}
+function toList(str){
+  var s=String(str||'').replace(/\(.*?\)/g,' ').replace(/[가-힣]+/g,' ').replace(/PNL/g,' ').replace(/\d+\s*함께.*/,' ');
+  return s.split(/[,\s]+/).filter(function(t){return /^[A-Z]/.test(t)&&!/^(ELP|CD|ST|FX|TRAY|PC|CABLE)$/.test(t)}).map(panelKey);
+}
+function keyFromName(n){return panelKey(String(n||'').replace(/\(.*?\)/g,''))}
+/*AN-END*/
+
+/*RV-START*/
+/* ===== 검토 판정: 분석 결과 + 사용자가 정한 기준 → 항목별 결과 ===== */
+function defaultSettings(){
+  return {recv:'high',kind:'기타',limits:{high:{'조명':6,'기타':8},low:{'조명':3,'기타':5}},
+    distAllow:true,loadRate:100,tempF:1,groupF:1,amp:amDefault(),od:odDefault(),condFill:32,condFill1:53,condFillSame:48,len:{},cur:{},kindRow:{},trays:[]};
+}
+function shNo(n){return 'E-'+String(n).replace(/^\d{1,2}$/,function(m){return ('00'+m).slice(-3)})}
+function sevRank(s){return s==='bad'?3:(s==='warn'?2:(s==='info'?1:0))}
+function worst(a,b){return sevRank(b)>sevRank(a)?b:a}
+function fmt(n,d){return (Math.round(n*Math.pow(10,d||0))/Math.pow(10,d||0)).toString()}
+function conduitCheck(c,routeTxt,S){
+  var cd=parseConduit(routeTxt);if(!cd||!c||!c.size)return null;
+  var set=cableSet(c),area=0,miss=[],maxd=0;
+  set.forEach(function(x){var d=odOf(S.od,x.kind,x.size);if(d==null){miss.push(x.kind+' '+x.size+'㎟');return}area+=x.n*Math.PI*d*d/4;if(d>maxd)maxd=d});
+  var D=cd.size,inner=Math.PI*D*D/4,o={type:cd.type,size:D,raw:cd.raw,count:set.reduce(function(a,x){return a+x.n},0),miss:miss,maxd:maxd};
+  if(!miss.length){o.fill=area/inner*100}
+  var sizes={};set.forEach(function(x){sizes[x.kind+x.size]=1});
+  o.lim=o.count<=1?S.condFill1:(Object.keys(sizes).length===1?S.condFillSame:S.condFill);
+  return o;
+}
+function conduitFindings(cd,S){
+  var f=[];if(!cd)return f;
+  var nm=(cd.type?cd.type+' ':'')+cd.size+(cd.tray?'':'')+'호';
+  if(cd.miss.length)f.push({sev:'info',t:'배관 '+nm+' 충전율: 바깥지름 표에 없는 규격('+cd.miss.join(', ')+')이 있어 계산하지 못했습니다(설정에서 입력).'});
+  else if(cd.maxd>cd.size*0.9)f.push({sev:'bad',t:'배관 '+nm+'에 바깥지름 '+cd.maxd+'mm 전선이 들어가 내경 대비 너무 굵습니다.'});
+  else if(cd.fill>cd.lim*1.5)f.push({sev:'bad',t:'배관 '+nm+' 충전율 '+fmt(cd.fill,1)+'% — 기준 '+cd.lim+'%를 크게 넘습니다.'});
+  else if(cd.fill>cd.lim)f.push({sev:'warn',t:'배관 '+nm+' 충전율 '+fmt(cd.fill,1)+'% > 기준 '+cd.lim+'% (직접 정한 기준 · KEC에는 수치 기준 없음)'});
+  return f;
+}
+function buildReview(ctx){
+  var S=ctx.settings,P=ctx.panels||[],SC=ctx.schedule||[],res={panels:[],cables:[],cross:[],notes:[]};
+  var byKey={};P.forEach(function(p){if(!byKey[keyFromName(p.name)])byKey[keyFromName(p.name)]=p});
+  /* --- 분전반별 --- */
+  P.forEach(function(p){
+    var f=[],all=p.br.concat(p.main?[p.main]:[]);
+    if(!p.main)f.push({sev:'info',t:'인입 차단기를 읽지 못했습니다. 도면에서 직접 확인하세요.'});
+    all.forEach(function(b){
+      if(b.af&&b.at&&b.af<b.at)f.push({sev:'bad',t:(b.name||'차단기')+' '+b.af+'AF/'+b.at+'AT — 프레임(AF)이 트립(AT)보다 작습니다.'});
+      if(b.at&&STD_AT.indexOf(b.at)<0)f.push({sev:'warn',t:(b.name||'차단기')+' AT '+b.at+'A는 표준 정격이 아닙니다.'});
+    });
+    var shock=p.br.filter(function(b){return /전열|콘센트|^AR\d|^AP\d/.test(b.name||'')&&/^(MCB|MCCB|)$/.test(b.type||'')&&b.at<=30});
+    if(shock.length)f.push({sev:'warn',t:'전열·콘센트 회로 '+shock.length+'개가 누전차단기(RCBO/ELB)가 아닌 것으로 읽혔습니다: '+shock.slice(0,3).map(function(b){return b.name}).join(', ')+(shock.length>3?' 외':'')+' (KEC 211.2.4 확인)'});
+    var n=p.br.length;
+    if(n>=6&&p.sp===0)f.push({sev:'info',t:'예비 회로가 없습니다.'});
+    var sum=p.br.reduce(function(a,b){return a+(b.at||0)},0);
+    var st='ok';f.forEach(function(x){st=worst(st,x.sev)});
+    res.panels.push({name:p.name,label:p.label,loc:p.loc,from:p.from,phase:p.phase,page:p.page,no:p.no,main:p.main,count:n,sp:p.sp,sumAT:sum,findings:f,sev:st});
+  });
+  /* --- 간선 케이블 --- */
+  var rowByTo={};
+  SC.forEach(function(r){toList(r.to).forEach(function(k){if(!rowByTo[k])rowByTo[k]=r})});
+  var limitTbl=S.limits[S.recv]||S.limits.high;
+  var memo={};
+  function vd(r,seen){ // 한 구간의 전압강하(%)와 길이
+    var c=r.cable;if(!c||!c.size||!c.core&&!c.lines)return null;
+    var L=parseFloat(S.len[r.no]),I=S.cur[r.no]!=null&&S.cur[r.no]!==''?parseFloat(S.cur[r.no]):r.designI;
+    if(!(L>0)||!(I>0))return {miss:true,L:L>0?L:0,I:I||0};
+    var three=c.core===4||c.lines===4,K=three?17.8:35.6;
+    var e=K*L*I/(1000*c.size);
+    return {e:e,pct:e/220*100,L:L,I:I,K:K};
+  }
+  SC.forEach(function(r){
+    var c=r.cable,o={no:r.no,cable:r.cableTxt||'',tray:r.tray,from:r.from,to:r.to,page:ctx.schedPage,findings:[],sev:'ok',fromKey:panelKey(r.from),toKeys:toList(r.to)};
+    if(c&&/^CNCV|^CN-?CV|^CV-?W/.test(c.type)){o.findings.push({sev:'info',t:'고압 케이블입니다. 저압 허용전류 표 검토 대상이 아닙니다.'});o.skip=true;res.cables.push(o);return}
+    if(c&&c.wire&&/GV/.test(c.type)){o.conduit=conduitCheck(c,(r.tray||'')+' '+(r.cableTxt||''),S);o.findings.push({sev:'info',t:'접지선이라 허용전류·전압강하 검토는 하지 않고 배관만 봅니다.'});conduitFindings(o.conduit,S).forEach(function(x){o.findings.push(x)});o.skip=true;o.skipConduitOnly=true;res.cables.push(o);return}
+    if(!c||!c.size){o.findings.push({sev:'info',t:'케이블 규격이 아니어서(통신·예비 등) 허용전류 검토를 건너뜁니다.'});o.skip=true;res.cables.push(o);return}
+    o.size=c.size;o.core=c.core;o.lines=c.lines;
+    var base=iz(c.size,c.core,S.amp);
+    if(base==null){o.findings.push({sev:'info',t:c.size+'㎟의 허용전류 표 값이 없습니다(설정에서 입력).'})}
+    else{o.iz=base*(S.tempF||1)*(S.groupF||1);o.izBase=base}
+    /* 차단기 AT: 발신측 우선, 없으면 수전측 인입 */
+    var fp=byKey[o.fromKey],tk=o.toKeys[0],tp=byKey[tk],src=null,srcBy='';
+    if(fp&&tk){fp.br.concat(fp.main?[fp.main]:[]).forEach(function(b){if(!src&&b.name&&keyFromName(b.name)===tk){src=b;srcBy='발신측('+fp.name+') 차단기'}})}
+    var fromIsPanel=!!fp||/^LV\/\d|^SS|^MDB/.test(o.fromKey);
+    if(!src&&tp&&tp.main&&fromIsPanel){src=tp.main;srcBy='수전측('+tp.name+') 인입 차단기'}
+    if(src){o.at=src.at;o.af=src.af;o.atBy=srcBy;r.designI=src.at*(S.loadRate||100)/100}
+    if(o.iz!=null&&o.at){
+      var m=o.iz/o.at;o.margin=m;
+      if(m<1)o.findings.push({sev:'bad',t:'허용전류 '+fmt(o.iz,0)+'A < 차단기 AT '+o.at+'A ('+srcBy+') — 케이블이 차단기보다 먼저 과열될 수 있습니다 (KEC 212.4.1).'});
+      else if(m<1.1)o.findings.push({sev:'warn',t:'허용전류 '+fmt(o.iz,0)+'A로 차단기 AT '+o.at+'A와 여유가 '+fmt((m-1)*100,0)+'%뿐입니다.'});
+    }else if(!o.at)o.findings.push({sev:'info',t:fromIsPanel?'비교할 차단기 AT를 도면에서 찾지 못했습니다.':'발신측('+(r.from||'-')+')이 분전반 결선도가 아니어서 차단기 비교를 생략했습니다.'});
+    /* 보호도체 */
+    if(c.pe){var need=peMin(c.size);o.pe=c.pe;o.peNeed=need;
+      if(c.pe+1e-9<need)o.findings.push({sev:'bad',t:'보호도체 '+c.pe+'㎟ < 최소 '+fmt(need,1)+'㎟ (KEC 142.3.2)'})}
+    else if(c.core===1||/FCV|CV/.test(c.type))o.findings.push({sev:'info',t:'보호도체(E/FGV) 표기가 없습니다.'});
+    /* 배관 충전율 */
+    o.conduit=conduitCheck(c,(r.tray||'')+' '+(r.cableTxt||''),S);
+    conduitFindings(o.conduit,S).forEach(function(x){o.findings.push(x)});
+    /* 상 구성 */
+    if(fromIsPanel&&tp&&tp.phase){var is3=c.core===4||c.lines===4,is1=c.core===2;
+      if(is3&&tp.phase!=='3Ø4W'||is1&&tp.phase!=='1Φ2W')o.findings.push({sev:'warn',t:'케이블은 '+(is3?'3상4선':'단상2선')+'인데 '+tp.name+' 분전반은 '+tp.phase+'로 표기되어 있습니다.'})}
+    /* 도면 일치 */
+    if(fromIsPanel&&tp&&tp.from&&o.fromKey&&tp.from!==o.fromKey)o.findings.push({sev:'warn',t:'간선 목록 FROM은 '+r.from+', '+tp.name+' 결선도의 FROM은 '+tp.from+'로 다릅니다.'});
+    if(!r.complete)o.findings.push({sev:'info',t:'목록표 줄을 완전히 읽지 못했습니다. 도면 원문과 대조하세요.'});
+    o.row=r;res.cables.push(o);
+  });
+  /* 전압강하(누적) */
+  function cum(o,seen){
+    var key=o.no;if(memo[key]!==undefined)return memo[key];
+    if(seen[key])return {pct:0,len:0,miss:true};
+    seen[key]=1;
+    var v=o.skip?null:vd(o.row,seen),parent=null;
+    var pr=rowByTo[o.fromKey];
+    if(pr){parent=res.cables.filter(function(x){return x.no===pr.no})[0]}
+    var up=parent&&parent!==o?cum(parent,seen):{pct:0,len:0,miss:false};
+    var out;
+    if(!v)out={pct:up.pct,len:up.len,miss:true};
+    else if(v.miss)out={pct:up.pct,len:up.len+v.L,miss:true};
+    else out={pct:up.pct+v.pct,len:up.len+v.L,miss:up.miss,self:v.pct};
+    if(v&&!v.miss)o.selfPct=v.pct;
+    o.I=v?v.I:0;o.L=v?v.L:0;
+    memo[key]=out;return out;
+  }
+  res.cables.forEach(function(o){
+    if(o.skip)return;
+    var cu=cum(o,{});
+    o.cumPct=cu.miss?null:cu.pct;o.cumLen=cu.len;o.partial=cu.miss;
+    var kind=S.kindRow[o.no]||S.kind,lim=limitTbl[kind];
+    var extra=S.distAllow?Math.min(0.5,Math.max(0,cu.len-100)*0.005):0;
+    o.limit=lim+extra;o.kind=kind;
+    if(o.cumPct!=null){
+      if(o.cumPct>o.limit)o.findings.push({sev:'bad',t:'누적 전압강하 '+fmt(o.cumPct,2)+'% > 허용 '+fmt(o.limit,2)+'% (KEC 232.3.9)'});
+      else if(o.cumPct>o.limit*0.8)o.findings.push({sev:'warn',t:'누적 전압강하 '+fmt(o.cumPct,2)+'%로 허용('+fmt(o.limit,2)+'%)의 80%를 넘습니다.'});
+    }
+  });
+  res.cables.forEach(function(o){var st='ok';o.findings.forEach(function(x){st=worst(st,x.sev)});o.sev=st});
+  /* --- 평면도 배선표의 배관 --- */
+  res.wires=[];
+  var mk=function(rw){return String(rw.cableTxt||'').replace(/\s+/g,'')+'|'+String(rw.tray||'').replace(/\s+/g,'')},mainK={},seenW={};
+  SC.forEach(function(rw){mainK[mk(rw)]=1});
+  (ctx.extra||[]).forEach(function(sc){sc.rows.forEach(function(rw){
+    var c=rw.cable;if(!c||!c.size)return;
+    var k=mk(rw);if(mainK[k])return;
+    if(seenW[k]){if(seenW[k].pages.indexOf(sc.page)<0)seenW[k].pages.push(sc.page);return}
+    var cd=conduitCheck(c,(rw.tray||'')+' '+(rw.cableTxt||''),S);if(!cd)return;
+    var f=conduitFindings(cd,S),st='ok';f.forEach(function(x){st=worst(st,x.sev)});
+    var o={page:sc.page,pages:[sc.page],no:sc.no,row:rw.no,cable:rw.cableTxt,route:rw.tray,conduit:cd,findings:f,sev:st};
+    seenW[k]=o;res.wires.push(o);
+  })});
+  /* --- 트레이 (KEC 232.41.1) --- */
+  res.trays=(S.trays||[]).map(function(t,ti){
+    var W=parseFloat(t.w)||0,sum=0,miss=[],hv=false,lv=false,items=[];
+    SC.forEach(function(r){if(!t.rows||!t.rows[r.no])return;var c=r.cable;if(!c)return;
+      if(/^CNCV|^CV-?W/.test(c.type||''))hv=true;else lv=true;
+      cableSet(c).forEach(function(x){var d=odOf(S.od,x.kind,x.size);if(d==null){miss.push('#'+r.no+' '+x.kind+' '+x.size+'㎟');return}
+        var w;if(x.kind==='CV1'&&t.lay==='tri'&&x.n>=3){var tri=Math.floor(x.n/3);w=tri*(2*d)+(tri>0?(tri)*2*d:0)+(x.n-tri*3)*d}else w=d*x.n;
+        sum+=w;items.push({no:r.no,kind:x.kind,size:x.size,n:x.n,d:d,w:w})})});
+    var f=[];
+    if(miss.length)f.push({sev:'info',t:'바깥지름 표에 없는 규격: '+miss.join(', ')});
+    if(W&&sum>W)f.push({sev:'bad',t:'케이블 바깥지름 합계 '+fmt(sum,0)+'mm > 트레이 내측폭 '+W+'mm — 단층 포설 불가 (KEC 232.41.1)'});
+    else if(W&&sum>W*0.9)f.push({sev:'warn',t:'바깥지름 합계 '+fmt(sum,0)+'mm로 내측폭 '+W+'mm의 90%를 넘습니다(여유 부족).'});
+    if(hv&&lv)f.push({sev:'bad',t:'저압 케이블과 고압 케이블이 같은 트레이에 있습니다. 불연성 격벽이나 금속외장 케이블이 아니면 안 됩니다 (KEC 232.41.1).'});
+    var st='ok';f.forEach(function(x){st=worst(st,x.sev)});
+    return {i:ti,name:t.name,w:W,lay:t.lay,sum:sum,items:items,findings:f,sev:st,n:Object.keys(t.rows||{}).filter(function(k){return t.rows[k]}).length};
+  });
+  /* --- 도면 간 대조 --- */
+  var schedTo={};SC.forEach(function(r){toList(r.to).forEach(function(k){schedTo[k]=r.no})});
+  P.forEach(function(p){
+    var k=keyFromName(p.name);
+    if(p.from&&!schedTo[k]&&!schedTo[k.replace(/(\D)(\d)$/,'$1-$2')])res.cross.push({sev:'warn',t:p.name+' 분전반 결선도('+(p.no?shNo(p.no):'')+')가 있으나 간선 목록(E-101)에 도착지로 나오지 않습니다.'});
+  });
+  var pk={};P.forEach(function(p){pk[keyFromName(p.name)]=1});
+  Object.keys(schedTo).forEach(function(k){
+    if(!pk[k]&&/^[A-Z]{1,3}(-[A-Z0-9~]+)+$/.test(k)&&!/^(SS|LV|PV|BIPV)/.test(k)){
+      res.cross.push({sev:'info',t:'간선 목록 '+schedTo[k]+'번의 도착지 '+k+'에 해당하는 분전반 결선도를 찾지 못했습니다(결선도가 따로 없는 분전반일 수 있음).'});
+    }
+  });
+  return res;
+}
+/*RV-END*/
+
+/* ---------- 분류 칸 / 표제란 읽기 ---------- */
+/*PURE-START*/
+var CELLS=[
+  {k:'cover',name:'표지',rt:'참고',rv:'ref'},
+  {k:'0',name:'일반·시방·마감 (0xx)',rt:'참고',rv:'ref'},
+  {k:'1',name:'수변전 (1xx)',rt:'수전·변압기 읽기',rv:'on'},
+  {k:'2',name:'분전반 결선도 (2xx)',rt:'자동 검토',rv:'on'},
+  {k:'3',name:'간선·접지 (3xx)',rt:'자동 검토',rv:'on'},
+  {k:'4',name:'전열 (4xx)',rt:'수량 검토',rv:'on'},
+  {k:'5',name:'전등 (5xx)',rt:'수량 검토',rv:'on'},
+  {k:'6',name:'냉난방 전원 (6xx)',rt:'수량 검토',rv:'on'},
+  {k:'7',name:'난방 전원 (7xx)',rt:'수량 검토',rv:'on'},
+  {k:'8',name:'전열교환 전원 (8xx)',rt:'수량 검토',rv:'on'},
+  {k:'9',name:'태양광·기타 (9xx)',rt:'준비 중',rv:'off'},
+  {k:'10',name:'철거 (10xx)',rt:'참고',rv:'ref'},
+  {k:'11',name:'제로에너지 (11xx)',rt:'준비 중',rv:'off'},
+  {k:'12',name:'전기 일반 상세 (12xx)',rt:'참고',rv:'ref'},
+  {k:'x',name:'번호를 읽지 못한 쪽',rt:'확인 필요',rv:'ref'}
+];
+function cellKey(no,page){
+  if(!no)return page===1?'cover':'x';
+  if(no<=29)return '0';
+  return String(Math.floor(no/100));
+}
+function blockTitle(items,w,h){
+  var kx=1190.55/w,ky=841.89/h,parts=[];
+  items.forEach(function(it){
+    var t=(it.str||'').trim();if(!t)return;
+    var x=it.transform[4]*kx,y=it.transform[5]*ky;
+    if(x>=625&&x<1060&&y>=44&&y<=73&&!/^E\s*-\s*\d{3,4}$/.test(t))parts.push({t:t,x:x,y:y});
+  });
+  parts.sort(function(a,b){return Math.abs(a.y-b.y)>2?b.y-a.y:a.x-b.x});
+  var seen={},tt=[];parts.forEach(function(p){if(!seen[p.t]){seen[p.t]=1;tt.push(p.t)}});
+  return tt.join(' ').replace(/\s+/g,' ').trim();
+}
+function parseListPos(items,w,h){
+  var kx=1190.55/w,ky=841.89/h,N=[],all=[],out={};
+  items.forEach(function(it){
+    var t=(it.str||'').trim();if(!t)return;
+    var x=it.transform[4]*kx,y=it.transform[5]*ky;
+    if(x>860&&y<170)return;
+    var o={t:t,x:x,y:y};all.push(o);
+    if(/^E\s*-\s*\d{3,4}$/.test(t))N.push(o);
+  });
+  N.forEach(function(n){
+    var parts=all.filter(function(o){return o!==n&&Math.abs(o.y-n.y)<3&&o.x>n.x+15&&o.x<n.x+290&&!/^A3\s*\(/.test(o.t)&&!/^(NONE|1\s*\/\s*\d+)$/.test(o.t)&&!/^E\s*-\s*\d{3,4}$/.test(o.t)});
+    parts.sort(function(a,b){return a.x-b.x});
+    var t=parts.map(function(p){return p.t}).join(' ').replace(/\s+/g,' ').trim(),no=parseInt(n.t.replace(/\D/g,''),10);
+    if(t&&!out[no])out[no]=t;
+  });
+  return out;
+}
+function normTitle(t){return String(t||'').replace(/[\s"“”'`]/g,'').replace(/[()（）\[\]]/g,'')}
+/*PURE-END*/
+/* ---------- 검토 가이드 (도면 종류별: 무엇을 봐야 하나) ---------- */
+var GUIDE=[
+ {t:'도면 일반 (0xx)',i:[['도면목록표와 실제 쪽의 번호·도면명 일치','auto'],['시방서·주기사항의 적용 기준(KEC·내선규정·KS) 확인','man'],['범례 심벌과 평면도 심벌 일치','man'],['설계개요(면적·층수)와 도면 일치','man']]},
+ {t:'수변전 (1xx)',i:[['수전 전압·변압기 용량 읽기','auto'],['변압기 용량 대비 부하 합계(수용률·부등률)','man'],['차단용량(kA)과 단락전류','man'],['고압 케이블 규격과 인입 경로','man'],['계량기함·한전 경계(책임분계점)','man'],['피뢰기·서지보호장치(SPD) 설치','man']]},
+ {t:'분전반 결선도 (2xx)',i:[['인입 차단기 AF ≥ AT, 표준 정격','auto'],['전열·콘센트 회로의 누전차단기 (KEC 211.2.4)','auto'],['예비 회로 개수','auto'],['결선도 FROM과 간선 목록 FROM 일치','auto'],['상(3상4선·단상2선)과 간선 케이블 심수 일치','auto'],['부하 합계 대비 인입 차단기 용량, 상 평형','man'],['분기 차단기 AT와 분기 전선 굵기','soon']]},
+ {t:'간선 케이블 (1xx·3xx 간선 목록)',i:[['허용전류 ≥ 차단기 AT (KEC 212.4.1)','auto'],['보호도체 굵기 (KEC 142.3.2)','auto'],['전압강하 — 거리·전류 입력, 누적 (KEC 232.3.9)','man'],['병렬 포설·단심 케이블 배열','man'],['저압·고압 케이블 분리','auto']]},
+ {t:'배관 (간선 목록·평면도 배선표)',i:[['배관 안 전선 가닥 수와 굵기 → 충전율','auto'],['관 종류(ELP·박강 E·후강 C·CD·FX)가 장소에 맞는지 (KEC 232.11~232.13)','man'],['지중 구간 관 종류·매설 깊이','man'],['풀박스 간격·굴곡 수','man']]},
+ {t:'케이블트레이',i:[['케이블 바깥지름 합계 ≤ 트레이 내측폭, 단층 포설 (KEC 232.41.1)','auto'],['저압·고압 케이블 같은 트레이 금지 (KEC 232.41.1)','auto'],['트레이 다회로 허용전류 저감계수','man'],['지지 간격·접지 본딩','man'],['트레이 길이·부속(엘보·티) 물량','soon']]},
+ {t:'접지·피뢰 (3xx)',i:[['접지시스템 구분·시설 (KEC 141·142)','man'],['접지도체 굵기','man'],['피뢰시스템 (KEC 151)','man'],['등전위본딩','man']]},
+ {t:'전열 (4xx)',i:[['콘센트·스위치 수량 = 도면 표기 수량','qty'],['콘센트의 시설 (KEC 234.5)','man'],['분기회로당 콘센트 수·회로명과 분전반 일치','man'],['AV·전원 설비 용량','man']]},
+ {t:'전등 (5xx)',i:[['등기구 종류별 수량 = 전등표','qty'],['조도·등기구 배치','man'],['유도등·비상조명','man'],['일괄소등·점멸 회로 구성','man']]},
+ {t:'냉난방·난방·전열교환 전원 (6xx~8xx)',i:[['장비 일람표 용량 vs 분전반 차단기','soon'],['전원 케이블 규격과 배관','soon'],['장비 수량','qty']]},
+ {t:'태양광·기타 (9xx)',i:[['태양광설비 시설 기준 (KEC 522)','man'],['태양광 용량·인버터 용량 일치','soon'],['AC 선로 전압강하','man'],['접속함·인버터 연결','soon']]},
+ {t:'철거·제로에너지·상세 (10xx~12xx)',i:[['철거 범위가 신설 도면과 충돌하지 않는지','man'],['상세도 규격이 시방·내역서와 일치','man']]}
+];
+var TAGS={auto:['자동','auto'],qty:['수량 탭','qty'],man:['직접 확인','man'],soon:['준비 중','soon']};
+var SEV_L={ok:'정상',info:'참고',warn:'주의',bad:'오류'},SEV_I={bad:'❌',warn:'⚠️',info:'ℹ️',ok:'✅'};
+
+/* ---------- 설정 저장 ---------- */
+var LS_SET='ed-set-v1';
+S.set=defaultSettings();S.an={sched:[],schedPage:0,panels:[],supply:null,textPages:0,pages:0};S.rev=null;S.tab='sum';S.filter='all';S.find='';
+function loadSet(){
+  try{var r=JSON.parse(localStorage.getItem(LS_SET)||'null');
+    if(r){['recv','kind','distAllow','loadRate','tempF','groupF','recvManual','condFill','condFill1','condFillSame'].forEach(function(k){if(r[k]!=null)S.set[k]=r[k]});if(r.od&&r.od.CV1)S.set.od=r.od;
+      if(r.limits)S.set.limits=r.limits;if(r.amp&&r.amp.E)S.set.amp=r.amp}}catch(e){}
+}
+function saveSet(){
+  try{var o={};['recv','kind','distAllow','loadRate','tempF','groupF','recvManual','limits','amp','od','condFill','condFill1','condFillSame'].forEach(function(k){o[k]=S.set[k]});localStorage.setItem(LS_SET,JSON.stringify(o))}catch(e){}
+}
+function fileKey(){return S.file?S.file.name+'|'+S.file.size:'none'}
+function loadIn(){
+  S.set.len={};S.set.cur={};S.set.kindRow={};S.set.trays=[];
+  try{var r=JSON.parse(localStorage.getItem('ed-in-'+fileKey())||'null');if(r){S.set.len=r.len||{};S.set.cur=r.cur||{};S.set.kindRow=r.kindRow||{};S.set.trays=r.trays||[]}}catch(e){}
+}
+function saveIn(){try{localStorage.setItem('ed-in-'+fileKey(),JSON.stringify({len:S.set.len,cur:S.set.cur,kindRow:S.set.kindRow,trays:S.set.trays}))}catch(e){}}
+
+/* ---------- 전체 분석(쪽마다 글자만 읽음) ---------- */
+async function scanAll(){
+  var pdf=S.pdf,n=pdf.numPages,rows=[],LT={},panels=[],scheds=[],trays={},supply={kv:0,kva:0,kvs:{},tr:[]},textPages=0;
+  S.idx=null;S.rev=null;S.autoOpened=false;S.userPicked=false;S.an={sched:[],schedPage:0,panels:[],supply:null,textPages:0,pages:n};
+  renderAll();
+  for(var p=1;p<=n;p++){
+    if(pdf!==S.pdf)return;
+    setProg(p/n);setStatus('도면을 읽는 중… '+p+'/'+n+'쪽');
+    var waited=0;while((S.pageLoading||(S.auto&&S.auto.busy))&&waited<600){await new Promise(function(r){setTimeout(r,100)});waited++}
+    var pg=await pdf.getPage(p),tc=await pg.getTextContent(),vp=pg.getViewport({scale:1}),it=tc.items;
+    if(it.length>30)textPages++;
+    var no=findSheetNo(it,vp.width,vp.height);
+    rows.push({page:p,no:no,title:no?blockTitle(it,vp.width,vp.height):''});
+    if(p===6&&!S.segs.length&&!S.userPicked&&!S.autoOpened){
+      var nos=Object.keys(LT).map(Number).sort(function(a,b){return a-b}),tgt=nos.filter(function(k){return k>=500&&k<600&&/전등/.test(LT[k])&&/평면도/.test(LT[k])&&!/확대|PIT/.test(LT[k])})[0];
+      var off=rows.filter(function(r){return r.no===nos[0]})[0];
+      if(tgt&&off){var gp=off.page+nos.indexOf(tgt);if(gp>=1&&gp<=n){S.autoOpened=true;S.idx=rows.slice();fillPageSelect();setTab('qty');loadPage(gp)}}
+    }
+    var lr=rows[rows.length-1];
+    if(!S.segs.length&&!S.userPicked&&!S.autoOpened&&cellKey(lr.no,p)==='5'&&/평면도/.test(lr.title)&&!/확대|PIT/.test(lr.title)){S.autoOpened=true;S.idx=rows.slice();fillPageSelect();setTab('qty');loadPage(p)}
+    if(no>=1&&no<=3){var lp=parseListPos(it,vp.width,vp.height);for(var k in lp)if(!LT[k])LT[k]=lp[k]}
+    try{
+      var sc=parseSchedule(it,vp.width,vp.height);
+      if(sc&&sc.length)scheds.push({page:p,no:no,rows:sc,complete:sc.filter(function(r){return r.complete}).length});
+      var ps=parsePanels(it,vp.width,vp.height);
+      ps.forEach(function(x){x.page=p;x.no=no;panels.push(x)});
+      findTrays(it).forEach(function(k){(trays[k]||(trays[k]=[])).indexOf(p)<0&&trays[k].push(p)});
+      var sp=parseSupply(it);
+      for(var kk in sp.kvs)supply.kvs[kk]=(supply.kvs[kk]||0)+sp.kvs[kk];
+      sp.tr.forEach(function(v){supply.tr.push(v)});
+    }catch(e){}
+    try{pg.cleanup()}catch(e){}
+    if(p%8===0){if(!S.rev){S.idx=rows.slice();fillPageSelect()}await new Promise(function(r){setTimeout(r,0)})}
+  }
+  rows.forEach(function(r){
+    if(!r.no)return;var lt=LT[r.no]||'';r.listTitle=lt;
+    if(!r.title&&lt){r.title=lt}
+    else if(r.title&&lt&&normTitle(r.title)!==normTitle(lt)){r.diff=true}
+  });
+  var bk=0;for(var k2 in supply.kvs){if(supply.kvs[k2]>bk){bk=supply.kvs[k2];supply.kv=parseFloat(k2)}}
+  if(supply.kvs[22.9])supply.kv=22.9;
+  supply.kva=supply.tr.length?Math.max.apply(null,supply.tr):0;
+  var best=null;scheds.forEach(function(s){if(!best||s.complete>best.complete)best=s});
+  S.idx=rows;
+  var main=best&&best.complete>=3?best:null;
+  S.an={sched:main?main.rows:[],schedPage:main?main.page:0,panels:panels,supply:supply,textPages:textPages,pages:n,trays:trays,extra:scheds.filter(function(s){return s!==main})};
+  if(supply.kv&&!S.set.recvManual)S.set.recv=supply.kv>=1?'high':'low';
+  loadIn();
+  setProg(1);setStatus('분석 완료 · '+S.file.name+' · '+n+'쪽');
+  runReview();
+  fillPageSelect();
+  var first=rows.filter(function(r){return cellKey(r.no,r.page)==='5'&&/평면도/.test(r.title||'')&&!/확대|PIT/.test(r.title||'')})[0]||rows.filter(function(r){return r.no})[0];
+  if(first&&!S.segs.length&&!S.autoOpened){setTab('qty');loadPage(first.page)}
+}
+function setProg(f){var b=$('prog');if(!b)return;b.parentNode.hidden=f>=1;b.style.width=Math.round(f*100)+'%'}
+function runReview(){
+  S.rev=buildReview({settings:S.set,panels:S.an.panels,schedule:S.an.sched,schedPage:S.an.schedPage,extra:S.an.extra||[]});
+  renderAll();
+}
+
+/* ---------- 화면 ---------- */
+function badge(sev){return '<span class="badge '+sev+'">'+SEV_L[sev]+'</span>'}
+function counts(){
+  var c={bad:0,warn:0,info:0,ok:0};
+  if(!S.rev)return c;
+  S.rev.cables.forEach(function(o){if(!o.skip||o.skipConduitOnly)c[o.sev]++});
+  (S.rev.wires||[]).forEach(function(o){c[o.sev]++});
+  (S.rev.trays||[]).forEach(function(o){c[o.sev]++});
+  S.rev.panels.forEach(function(o){c[o.sev]++});
+  S.rev.cross.forEach(function(o){c[o.sev]++});
+  if(S.idx)S.idx.forEach(function(r){if(r.diff)c.warn++});
+  return c;
+}
+function renderAll(){renderTabs();renderSum();renderCls();renderCab();renderGuide()}
+function renderTabs(){
+  var c=counts(),t=[['qty','📐 도면 보기'],['sum','📊 전체 검토'],['cab','🔌 간선·분전반 표'],['cls','🗂️ 도면 목록'],['kec','📖 KEC 검색'],['gd','📋 검토 가이드']];
+  var box=$('tabs2');box.innerHTML='';
+  t.forEach(function(a){
+    var b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',S.tab===a[0]?'true':'false');
+    b.innerHTML=a[1]+(a[0]==='sum'&&c.bad?'<span class="cnt2">'+c.bad+'</span>':'');
+    b.addEventListener('click',function(){setTab(a[0])});box.appendChild(b);
+  });
+  ['sum','cls','cab','qty','kec','gd'].forEach(function(k){$('v-'+k).hidden=S.tab!==k});
+  if(S.tab==='kec')renderKEC();
+}
+function setTab(t){
+  S.tab=t;renderTabs();
+  if(t==='qty'){resize();if(S.segs.length)fitView();draw()}
+  window.scrollTo({top:0})
+}
+function openFromCls(page){$('pageNo').value=page;setTab('qty');loadPage(page)}
+function jumpBtn(page,label){return page?'<button type="button" data-pg="'+page+'">'+(label||'도면 보기')+'</button>':''}
+function bindJumps(root){root.querySelectorAll('[data-pg]').forEach(function(b){b.addEventListener('click',function(){openFromCls(parseInt(b.dataset.pg,10))})});
+  root.querySelectorAll('[data-kec]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();openKEC(a.dataset.kec)})})}
+function lk(s){return esc(s).replace(/KEC\s*(\d{3}(?:\.\d+)*)/g,'<a href="#" class="keclink" data-kec="$1">KEC $1</a>')}
+
+function renderSum(){
+  var box=$('v-sum'),h='';
+  if(!S.pdf){
+    box.innerHTML='<div class="card hero"><div class="big">📐</div><h2>전기 도면 PDF를 열어 보세요</h2><div class="mini">177쪽짜리 도면도 한 번에 읽어서 분류하고 검토합니다.</div>'+
+      '<div class="steps"><div class="step"><b>① PDF 열기</b><span>오른쪽 위 버튼으로 도면을 고르세요.</span></div><div class="step"><b>② 자동 분석</b><span>도면번호·분전반·간선 목록을 글자로 읽어요.</span></div><div class="step"><b>③ 결과 확인</b><span>문제가 있는 곳부터 알려 드려요. 거리·전류만 직접 넣으면 전압강하도 계산해요.</span></div></div></div>';
+    return;
+  }
+  if(!S.rev){box.innerHTML='<div class="card hero"><div class="big">⏳</div><h2>도면을 읽는 중입니다…</h2><div class="mini">쪽 수가 많으면 1~2분 걸릴 수 있어요. 이 화면을 닫지 마세요.</div></div>';return}
+  var an=S.an,c=counts();
+  if(an.textPages<an.pages*0.3){
+    h+='<div class="banner warn">⚠️ 이 PDF는 글자가 거의 없는 <b>스캔본(그림)</b>입니다. 도면번호·분전반·간선을 자동으로 읽을 수 없어요. 글자가 살아 있는 원본(CAD에서 낸 PDF)을 올려 주세요. 수량 검토도 선이 없는 스캔본은 어렵습니다.</div>';
+  }
+  var noC=S.idx?S.idx.filter(function(r){return r.no}).length:0;
+  h+='<div class="stats">'+
+    '<div class="stat"><div class="n">'+an.pages+'</div><div class="l">전체 쪽</div></div>'+
+    '<div class="stat"><div class="n">'+noC+'</div><div class="l">도면번호 인식</div></div>'+
+    '<div class="stat"><div class="n">'+an.panels.length+'</div><div class="l">분전반 결선도</div></div>'+
+    '<div class="stat"><div class="n">'+an.sched.length+'</div><div class="l">간선 목록 줄</div></div>'+
+    '<div class="stat bad"><div class="n">'+c.bad+'</div><div class="l">❌ 오류</div></div>'+
+    '<div class="stat warn"><div class="n">'+c.warn+'</div><div class="l">⚠️ 주의</div></div>'+
+    '<div class="stat info"><div class="n">'+c.info+'</div><div class="l">ℹ️ 참고</div></div>'+
+    '<div class="stat ok"><div class="n">'+c.ok+'</div><div class="l">✅ 정상</div></div></div>';
+  /* 수전 */
+  var sp=an.supply,limit=S.set.limits[S.set.recv];
+  h+='<div class="card"><h2>⚡ 수전 방식과 전압강하 기준</h2>';
+  if(sp&&sp.kv){h+='<div>수변전 도면에서 <b>'+sp.kv+'kV 수전</b>'+(sp.kva?', 변압기 <b>'+sp.kva+'kVA</b>':'')+'을(를) 읽었습니다. </div>'}
+  else h+='<div>수변전 도면에서 수전 전압을 읽지 못했습니다. 아래 기준을 직접 고르세요.</div>';
+  h+='<div class="mini" style="margin-top:6px">현재 기준: <b>'+(S.set.recv==='high'?'고압 이상 수전 · 자가 변압기':'저압 수전')+'</b> → 조명 '+limit['조명']+'% / 기타 '+limit['기타']+'% ('+lk('KEC 232.3.9')+')'+(S.set.distAllow?' · 100m 초과분 0.005%/m 가산(최대 0.5%)':'')+'</div>'+
+    '<div style="margin-top:8px"><button type="button" id="goSet">기준 바꾸기</button></div></div>';
+  /* 먼저 확인 */
+  var iss=[];
+  S.rev.cables.forEach(function(o){if(o.skip&&!o.skipConduitOnly)return;o.findings.forEach(function(f){if(f.sev==='bad'||f.sev==='warn')iss.push({sev:f.sev,t:f.t,w:'간선 #'+o.no+' · '+o.to+' ← '+o.from,pg:S.an.schedPage})})});
+  S.rev.panels.forEach(function(o){o.findings.forEach(function(f){if(f.sev==='bad'||f.sev==='warn')iss.push({sev:f.sev,t:f.t,w:'분전반 '+o.name+(o.no?' · '+shNo(o.no):''),pg:o.page})})});
+  S.rev.cross.forEach(function(o){if(o.sev!=='info')iss.push({sev:o.sev,t:o.t,w:'도면 간 대조',pg:0})});
+  (S.rev.wires||[]).forEach(function(o){o.findings.forEach(function(f){if(f.sev!=='info')iss.push({sev:f.sev,t:f.t,w:'배선표 '+(o.no?shNo(o.no):o.page+'쪽')+' · '+o.cable,pg:o.page})})});
+  (S.rev.trays||[]).forEach(function(o){o.findings.forEach(function(f){if(f.sev!=='info')iss.push({sev:f.sev,t:f.t,w:'트레이 '+(o.name||''),pg:0})})});
+  if(S.idx)S.idx.forEach(function(r){if(r.diff)iss.push({sev:'warn',t:shNo(r.no)+' 쪽의 도면명 “'+r.title+'”가 도면목록표 “'+r.listTitle+'”와 다릅니다.',w:'도면목록표 대조',pg:r.page})});
+  iss.sort(function(a,b){return sevRank(b.sev)-sevRank(a.sev)});
+  h+='<div class="card"><h2>👀 먼저 확인할 것 <span class="mini">('+iss.length+'건)</span></h2>';
+  if(!iss.length)h+='<div class="empty2">자동으로 찾은 오류·주의 항목이 없습니다. 👍<br><span class="mini">거리·전류를 입력하면 전압강하도 검토합니다.</span></div>';
+  iss.slice(0,15).forEach(function(x){h+='<div class="issue"><div class="ic">'+SEV_I[x.sev]+'</div><div class="tx">'+lk(x.t)+'<small>'+esc(x.w)+'</small></div>'+jumpBtn(x.pg)+'</div>'});
+  if(iss.length>15)h+='<div class="mini" style="padding-top:8px">…외 '+(iss.length-15)+'건은 각 탭에서 확인하세요.</div>';
+  h+='</div>';
+  if(!an.sched.length)h+='<div class="banner info">ℹ️ 간선 목록(CABLE SCHEDULE: 번호·규격·FROM·TO)을 찾지 못했습니다. 이 도면은 간선 목록이 없거나 형식이 달라서 허용전류·전압강하 검토를 건너뜁니다.</div>';
+  box.innerHTML=h;bindJumps(box);
+  var gs=$('goSet');if(gs)gs.addEventListener('click',function(){setTab('cab');var d=$('setBox');d.open=true;d.scrollIntoView({behavior:'smooth'})});
+}
+
+function renderCls(){
+  var box=$('cells'),q=($('clsFind').value||'').trim().toLowerCase();
+  box.innerHTML='';
+  if(!S.idx){$('clsInfo').textContent=S.pdf?'도면을 읽는 중…':'PDF를 열면 자동으로 분류됩니다.';return}
+  $('clsInfo').textContent=S.idx.length+'쪽 · '+S.idx.filter(function(r){return r.no}).length+'개 도면번호';
+  var mism=S.idx.filter(function(r){return r.diff}).length;
+  $('clsNote').textContent=(mism?'⚠️ 쪽의 도면명이 도면목록표와 다른 도면 '+mism+'개는 주황색으로 표시했습니다. ':'')+'번호·도면명은 각 쪽 표제란에서 읽었습니다.';
+  CELLS.forEach(function(c){
+    var rows=S.idx.filter(function(r){return cellKey(r.no,r.page)===c.k});
+    if(!rows.length)return;
+    var shown=q?rows.filter(function(r){return (String(r.no)+' '+r.title+' p'+r.page).toLowerCase().indexOf(q)>=0}):rows;
+    if(q&&!shown.length)return;
+    var d=document.createElement('details');d.className='cell';if(q)d.open=true;
+    d.innerHTML='<summary><span class="cn">'+esc(c.name)+'</span><span class="cc">'+rows.length+'쪽</span><span class="rv '+c.rv+'">'+esc(c.rt)+'</span></summary><div class="plist"></div>';
+    var pl=d.querySelector('.plist');
+    shown.forEach(function(r){
+      var b=document.createElement('button');b.type='button';b.className='prow'+(r.no&&!r.title?' miss':'')+(r.diff?' diff':'');
+      b.innerHTML='<span class="pn">'+(r.no?shNo(r.no):'-')+'</span><span class="pt">'+esc(r.title||(r.no?'(도면명 확인 필요)':'(번호 없음)'))+(r.diff?'<br><small class="sub">목록표: '+esc(r.listTitle)+'</small>':'')+'</span><span class="pp">'+r.page+'쪽</span>';
+      b.addEventListener('click',function(){openFromCls(r.page)});
+      pl.appendChild(b);
+    });
+    box.appendChild(d);
+  });
+  if(!box.children.length)box.innerHTML='<p class="empty2">검색 결과가 없습니다.</p>';
+}
+
+function fnum(n,d){return n==null||isNaN(n)?'-':(Math.round(n*Math.pow(10,d||0))/Math.pow(10,d||0)).toString()}
+function renderCab(){
+  var box=$('v-cab');
+  if(!S.rev){box.innerHTML='<div class="card empty2">'+(S.pdf?'도면을 읽는 중입니다…':'PDF를 열면 간선·분전반 검토 결과가 여기에 나옵니다.')+'</div>';return}
+  var keep=$('setBox')&&$('setBox').open,h='';
+  h+=settingsHtml(keep);
+  h+='<div class="chips" id="chipbar"></div>';
+  h+='<div id="cablist"></div>';
+  box.innerHTML=h;
+  bindSettings();
+  renderChips();renderCabList();
+}
+function settingsHtml(open){
+  var s=S.set,lm=s.limits;
+  var ampE=Object.keys(s.amp.E).sort(function(a,b){return a-b}),ampF=Object.keys(s.amp.F).sort(function(a,b){return a-b});
+  function ampIn(t,k){return '<label>'+k+'㎟<input type="number" data-amp="'+t+':'+k+'" value="'+s.amp[t][k]+'" min="1"></label>'}
+  return '<details class="set card" id="setBox"'+(open?' open':'')+'><summary>⚙️ 검토 기준 설정 <span class="mini">(직접 정하는 값 — 바꾸면 바로 다시 계산)</span></summary>'+
+   '<div class="setgrid">'+
+   '<label>수전 방식<select id="sRecv"><option value="high"'+(s.recv==='high'?' selected':'')+'>고압 이상 수전(자가 변압기)</option><option value="low"'+(s.recv==='low'?' selected':'')+'>저압 수전</option></select></label>'+
+   '<label>기본 부하 구분<select id="sKind"><option value="기타"'+(s.kind==='기타'?' selected':'')+'>기타(전열·동력 등)</option><option value="조명"'+(s.kind==='조명'?' selected':'')+'>조명</option></select></label>'+
+   '<label>고압 수전 한계 조명 / 기타(%)<span style="display:flex;gap:6px"><input type="number" step="0.1" id="lhL" value="'+lm.high['조명']+'"><input type="number" step="0.1" id="lhE" value="'+lm.high['기타']+'"></span></label>'+
+   '<label>저압 수전 한계 조명 / 기타(%)<span style="display:flex;gap:6px"><input type="number" step="0.1" id="llL" value="'+lm.low['조명']+'"><input type="number" step="0.1" id="llE" value="'+lm.low['기타']+'"></span></label>'+
+   '<label>부하율(차단기 AT 대비 %) — 전류를 안 넣었을 때<input type="number" id="sRate" value="'+s.loadRate+'" min="1" max="100"></label>'+
+   '<label>온도 보정계수<input type="number" step="0.01" id="sTemp" value="'+s.tempF+'"></label>'+
+   '<label>다회로(그룹) 보정계수<input type="number" step="0.01" id="sGrp" value="'+s.groupF+'"></label>'+
+   '<label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="sDist"'+(s.distAllow?' checked':'')+' style="min-height:auto;width:auto"> 100m 초과 가산(0.005%/m, 최대 0.5%)</label>'+
+   '</div>'+
+   '<div class="mini" style="margin-top:10px"><b>허용전류 표</b> — '+lk('KEC 232.5.2')+'는 KS C IEC 60364-5-52 부속서 B의 표를 따르도록 정하고 있고, 그 표는 KEC 본문에 없습니다. 아래는 구리·XLPE·공기 중(트레이)·부하 3선·30℃ 기준 기본값이니 KS 표와 다르면 고치세요. 다심 케이블은 E, 단심은 F 값을 씁니다(4심은 3심과 같음, '+lk('KEC 232.5.4')+').</div>'+
+   '<div class="mini" style="margin-top:6px">다심(E)</div><div class="amp">'+ampE.map(function(k){return ampIn('E',k)}).join('')+'</div>'+
+   '<div class="mini" style="margin-top:6px">단심(F)</div><div class="amp">'+ampF.map(function(k){return ampIn('F',k)}).join('')+'</div>'+
+   '<div class="mini" style="margin-top:12px"><b>배관 충전율 기준</b> — 전선 바깥지름으로 구한 단면적 합 ÷ 관 내단면적. KEC에는 수치 기준이 없어 직접 정합니다(기본값: 여러 가닥·다른 굵기 32%, 같은 굵기 48%, 1가닥 53%). 관 내경은 호칭(예: E 51 → 51mm)으로 계산합니다.</div>'+
+   '<div class="setgrid"><label>다른 굵기 섞임(%)<input type="number" id="cf" value="'+s.condFill+'"></label><label>같은 굵기(%)<input type="number" id="cfs" value="'+s.condFillSame+'"></label><label>1가닥(%)<input type="number" id="cf1" value="'+s.condFill1+'"></label></div>'+
+   '<div class="mini" style="margin-top:12px"><b>전선 바깥지름(mm)</b> — 근사값입니다. 실제 쓰는 제조사 카탈로그 값으로 고치세요(트레이·배관 계산에 씁니다).</div>'+odGrid(s)+
+   '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="sReset">기본값으로 되돌리기</button><button type="button" id="copyCab">간선 결과 복사(엑셀용)</button></div><div class="mini" id="copyMsg"></div></details>';
+}
+function bindSettings(){
+  function chg(fn){return function(e){fn(e.target);S.set.recvManual=S.set.recvManual||false;saveSet();runReview()}}
+  var el=$('sRecv');if(!el)return;
+  el.addEventListener('change',function(e){S.set.recv=e.target.value;S.set.recvManual=true;saveSet();runReview()});
+  $('sKind').addEventListener('change',chg(function(t){S.set.kind=t.value}));
+  $('lhL').addEventListener('change',chg(function(t){S.set.limits.high['조명']=parseFloat(t.value)||0}));
+  $('lhE').addEventListener('change',chg(function(t){S.set.limits.high['기타']=parseFloat(t.value)||0}));
+  $('llL').addEventListener('change',chg(function(t){S.set.limits.low['조명']=parseFloat(t.value)||0}));
+  $('llE').addEventListener('change',chg(function(t){S.set.limits.low['기타']=parseFloat(t.value)||0}));
+  $('sRate').addEventListener('change',chg(function(t){S.set.loadRate=Math.min(100,Math.max(1,parseFloat(t.value)||100))}));
+  $('sTemp').addEventListener('change',chg(function(t){S.set.tempF=parseFloat(t.value)||1}));
+  $('sGrp').addEventListener('change',chg(function(t){S.set.groupF=parseFloat(t.value)||1}));
+  $('sDist').addEventListener('change',chg(function(t){S.set.distAllow=t.checked}));
+  [['cf','condFill'],['cfs','condFillSame'],['cf1','condFill1']].forEach(function(a){$(a[0]).addEventListener('change',function(e){S.set[a[1]]=parseFloat(e.target.value)||S.set[a[1]];saveSet();runReview()})});
+  document.querySelectorAll('[data-od]').forEach(function(i){i.addEventListener('change',function(){var a=i.dataset.od.split(':');S.set.od[a[0]][a[1]]=parseFloat(i.value)||0;saveSet();runReview()})});
+  document.querySelectorAll('[data-amp]').forEach(function(i){i.addEventListener('change',function(e){var a=i.dataset.amp.split(':');S.set.amp[a[0]][a[1]]=parseFloat(i.value)||0;saveSet();runReview()})});
+  $('sReset').addEventListener('click',function(){var d=defaultSettings();['recv','kind','limits','distAllow','loadRate','tempF','groupF','amp','od','condFill','condFill1','condFillSame'].forEach(function(k){S.set[k]=d[k]});S.set.recvManual=false;if(S.an.supply&&S.an.supply.kv)S.set.recv=S.an.supply.kv>=1?'high':'low';saveSet();runReview();toast('기본값으로 되돌렸습니다.')});
+  $('copyCab').addEventListener('click',copyCab);
+}
+function renderChips(){
+  var bar=$('chipbar');if(!bar)return;
+  var items=[['all','전체'],['bad','❌ 오류'],['warn','⚠️ 주의'],['info','ℹ️ 참고'],['ok','✅ 정상']];
+  var mode=S.cabMode||'cab';
+  bar.innerHTML='<button type="button" class="chip" data-m="cab" aria-pressed="'+(mode==='cab')+'">간선 케이블 '+S.rev.cables.length+'</button><button type="button" class="chip" data-m="pnl" aria-pressed="'+(mode==='pnl')+'">분전반 '+S.rev.panels.length+'</button><button type="button" class="chip" data-m="wire" aria-pressed="'+(mode==='wire')+'">평면도 배선표 '+(S.rev.wires||[]).length+'</button><button type="button" class="chip" data-m="tray" aria-pressed="'+(mode==='tray')+'">케이블트레이 '+(S.set.trays||[]).length+'</button><span style="width:8px"></span>'+
+    items.map(function(a){return '<button type="button" class="chip" data-f="'+a[0]+'" aria-pressed="'+(S.filter===a[0])+'">'+a[1]+'</button>'}).join('')+
+    '<input type="text" id="cabFind" placeholder="이름 검색" value="'+esc(S.find)+'" style="flex:1 1 140px;min-height:34px">';
+  bar.querySelectorAll('[data-m]').forEach(function(b){b.addEventListener('click',function(){S.cabMode=b.dataset.m;renderChips();renderCabList()})});
+  bar.querySelectorAll('[data-f]').forEach(function(b){b.addEventListener('click',function(){S.filter=b.dataset.f;renderChips();renderCabList()})});
+  $('cabFind').addEventListener('input',function(e){S.find=e.target.value;renderCabList()});
+}
+function passF(sev,txt){
+  if(S.filter!=='all'&&sev!==S.filter)return false;
+  if(S.find&&txt.toLowerCase().indexOf(S.find.toLowerCase())<0)return false;
+  return true;
+}
+function renderCabList(){
+  var box=$('cablist');if(!box)return;var h='';
+  if((S.cabMode||'cab')==='cab'){
+    if(!S.rev.cables.length)h='<div class="card empty2">간선 목록을 읽지 못했습니다.<br><span class="mini">도면에 CABLE SCHEDULE(번호·규격·FROM·TO 표)가 있어야 검토할 수 있어요.</span></div>';
+    else{
+      h='<div class="list two">';var n=0;
+      S.rev.cables.forEach(function(o){
+        var txt=o.no+' '+o.cable+' '+o.from+' '+o.to;if(!passF(o.sev,txt))return;n++;
+        h+=cabCard(o);
+      });
+      h+='</div>';if(!n)h='<div class="card empty2">조건에 맞는 항목이 없습니다.</div>';
+    }
+  }else if(S.cabMode==='wire'){
+    var ws=S.rev.wires||[];h='<div class="list two">';var k=0;
+    ws.forEach(function(o){if(!passF(o.sev,o.cable+' '+o.route))return;k++;h+=wireCard(o)});
+    h+='</div>';if(!ws.length)h='<div class="card empty2">평면도에서 배선표(번호·배선규격·배관규격)를 찾지 못했습니다.</div>';else if(!k)h='<div class="card empty2">조건에 맞는 항목이 없습니다.</div>';
+  }else if(S.cabMode==='tray'){
+    h=trayHtml();
+  }else{
+    h='<div class="list two">';var m=0;
+    S.rev.panels.forEach(function(o){if(!passF(o.sev,o.name+' '+o.loc))return;m++;h+=panelCard(o)});
+    h+='</div>';if(!m)h='<div class="card empty2">조건에 맞는 분전반이 없습니다.</div>';
+  }
+  box.innerHTML=h;bindJumps(box);if(S.cabMode==='tray')bindTray(box);
+  box.querySelectorAll('input[data-len]').forEach(function(i){i.addEventListener('change',function(){setIn('len',i.dataset.len,i.value)})});
+  box.querySelectorAll('input[data-cur]').forEach(function(i){i.addEventListener('change',function(){setIn('cur',i.dataset.cur,i.value)})});
+  box.querySelectorAll('select[data-kind]').forEach(function(i){i.addEventListener('change',function(){setIn('kindRow',i.dataset.kind,i.value)})});
+}
+function setIn(k,no,v){
+  if(v===''||v==null)delete S.set[k][no];else S.set[k][no]=(k==='kindRow')?v:parseFloat(v);
+  saveIn();runReview();
+}
+function cabCard(o){
+  var h='<div class="card cab sev-'+o.sev+'"><div class="ch"><span class="no">#'+o.no+'</span><b>'+esc(o.to||'?')+' ← '+esc(o.from||'?')+'</b>'+(o.skip?'<span class="badge info">검토 제외</span>':badge(o.sev))+'</div>'+
+    '<div class="cs">'+esc(o.cable)+(o.tray?' · '+esc(o.tray):'')+'</div>';
+  if(o.skipConduitOnly&&o.conduit)h+='<div class="kv">'+condKV(o.conduit)+'</div>';
+  if(!o.skip){
+    var izc=o.iz!=null&&o.at?(o.iz<o.at?'bad':(o.iz<o.at*1.1?'warn':'ok')):'';
+    h+='<div class="kv"><div>허용전류<b class="'+izc+'">'+(o.iz!=null?fnum(o.iz,0)+' A':'-')+'</b></div><div>차단기 AT<b>'+(o.at?o.at+' A':'-')+'</b><span style="font-size:10.5px">'+esc(o.atBy||'')+'</span></div>'+
+      '<div>보호도체<b class="'+(o.pe?(o.pe>=o.peNeed?'ok':'bad'):'')+'">'+(o.pe?o.pe+'㎟':'-')+'</b><span style="font-size:10.5px">'+(o.peNeed?'최소 '+fnum(o.peNeed,1)+'㎟':'')+'</span></div>'+condKV(o.conduit)+'</div>';
+    var Lv=S.set.len[o.no]!=null?S.set.len[o.no]:'',Cv=S.set.cur[o.no]!=null?S.set.cur[o.no]:'',kd=S.set.kindRow[o.no]||'';
+    h+='<div class="vdin"><label>거리 <input type="number" min="0" step="1" data-len="'+o.no+'" value="'+Lv+'" placeholder="m" inputmode="decimal"> m</label>'+
+      '<label>전류 <input type="number" min="0" step="1" data-cur="'+o.no+'" value="'+Cv+'" placeholder="'+(o.at?fnum(o.at*S.set.loadRate/100,0):'A')+'" inputmode="decimal"> A</label>'+
+      '<label>구분 <select data-kind="'+o.no+'"><option value="">기본('+S.set.kind+')</option><option value="조명"'+(kd==='조명'?' selected':'')+'>조명</option><option value="기타"'+(kd==='기타'?' selected':'')+'>기타</option></select></label></div>';
+    if(o.cumPct!=null){
+      var f=Math.min(100,o.cumPct/o.limit*100),cl=o.cumPct>o.limit?'bad':(o.cumPct>o.limit*.8?'warn':'ok');
+      h+='<div class="gauge"><i class="'+cl+'" style="width:'+f+'%"></i><span>누적 '+fnum(o.cumPct,2)+'% / 허용 '+fnum(o.limit,2)+'%'+(o.selfPct!=null?' (이 구간 '+fnum(o.selfPct,2)+'%)':'')+'</span></div>';
+    }else h+='<div class="gauge"><span>거리를 넣으면 전압강하를 계산합니다'+(o.partial&&o.cumLen?' (상위 구간 거리도 필요)':'')+'</span></div>';
+  }
+  if(o.findings.length){h+='<ul class="fl">'+o.findings.map(function(f){return '<li class="'+f.sev+'">'+SEV_I[f.sev]+' '+lk(f.t)+'</li>'}).join('')+'</ul>'}
+  h+='<div style="margin-top:8px">'+jumpBtn(S.an.schedPage,'간선 목록 보기')+'</div></div>';
+  return h;
+}
+function panelCard(o){
+  var P=S.an.panels.filter(function(p){return p.name===o.name&&p.page===o.page})[0];
+  var h='<div class="card cab sev-'+o.sev+'"><div class="ch"><b>'+esc(o.label||o.name)+'</b>'+badge(o.sev)+'</div>'+
+    '<div class="cs">'+(o.no?shNo(o.no)+' · ':'')+esc(o.loc||'위치 미표기')+(o.from?' · 전원: '+esc(o.from):'')+(o.phase?' · '+o.phase:'')+'</div>'+
+    '<div class="kv"><div>인입 차단기<b>'+(o.main?(o.main.type?o.main.type+' ':'')+o.main.af+'/'+o.main.at+'A':'-')+'</b></div><div>분기 회로<b>'+o.count+'</b></div><div>예비 회로<b>'+o.sp+'</b></div><div>분기 AT 합<b>'+o.sumAT+' A</b></div></div>';
+  if(o.findings.length)h+='<ul class="fl">'+o.findings.map(function(f){return '<li class="'+f.sev+'">'+SEV_I[f.sev]+' '+lk(f.t)+'</li>'}).join('')+'</ul>';
+  if(P&&P.br.length){h+='<details style="margin-top:8px"><summary class="mini" style="cursor:pointer">회로 목록 보기 ('+P.br.length+')</summary><ul class="cir">'+P.br.map(function(b){return '<li>'+esc(b.name||'(이름 미확인)')+' — '+(b.type?b.type+' ':'')+(b.poles?b.poles+'P ':'')+b.af+'AF/'+b.at+'AT</li>'}).join('')+'</ul></details>'}
+  h+='<div style="margin-top:8px">'+jumpBtn(o.page)+'</div></div>';
+  return h;
+}
+function copyCab(){
+  var rows=[['번호','도착','발신','케이블','허용전류(A)','차단기AT(A)','보호도체(㎟)','거리(m)','전류(A)','구간 전압강하(%)','누적(%)','허용(%)','판정']];
+  S.rev.cables.forEach(function(o){rows.push([o.no,o.to,o.from,o.cable,o.iz!=null?fnum(o.iz,0):'',o.at||'',o.pe||'',S.set.len[o.no]||'',S.set.cur[o.no]||'',o.selfPct!=null?fnum(o.selfPct,2):'',o.cumPct!=null?fnum(o.cumPct,2):'',o.limit?fnum(o.limit,2):'',o.skip?'제외':SEV_L[o.sev]])});
+  var txt=rows.map(function(r){return r.join('\t')}).join('\n'),m=$('copyMsg');
+  function fb(){var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');m.textContent='복사했습니다. 엑셀에 붙여넣으세요.'}catch(e){m.textContent='복사하지 못했습니다.'}document.body.removeChild(ta)}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){m.textContent='복사했습니다. 엑셀에 붙여넣으세요.'},fb);else fb();
+}
+function renderGuide(){
+  var box=$('v-gd'),h='<div class="card"><h2>📋 도면 종류별 검토 가이드</h2><div class="mini">무엇을 봐야 하는지, 그중 앱이 대신 해 주는 것과 직접 확인할 것을 나눴어요. <span class="tag auto">자동</span> <span class="tag qty">수량 탭</span> <span class="tag man">직접 확인</span> <span class="tag soon">준비 중</span></div></div><div class="gd">';
+  GUIDE.forEach(function(g){h+='<div class="card"><h2>'+esc(g.t)+'</h2><ul>'+g.i.map(function(i){var t=TAGS[i[1]];return '<li><span class="tag '+t[1]+'">'+t[0]+'</span><span>'+lk(i[0])+'</span></li>'}).join('')+'</ul></div>'});
+  h+='</div><div class="card"><h2>알아 두세요</h2><div class="mini">· 전압강하 한계(KEC 232.3.9)와 보호도체 기준(KEC 142.3.2)은 KEC 원문(2026.1.5 시행)과 대조해 넣었습니다. 허용전류 표는 KEC가 KS C IEC 60364-5-52 부속서 B를 따르도록 해서 기본값으로 넣었으니 KS 표로 확인하세요.<br>· 전압강하는 간이식(리액턴스 무시) <b>e = K·L·I / (1000·A)</b>, 3상4선 K=17.8, 단상2선 K=35.6, 기준전압 220V로 계산합니다.<br>· 거리는 도면에서 직접 재어 넣으세요(트레이 길이는 평면도 스케일로 측정).<br>· 인터넷이 없는 PC에서는 pdf.min.js와 pdf.worker.min.js를 이 파일과 같은 폴더에 두면 그 파일을 먼저 씁니다.</div></div>';
+  box.innerHTML=h;bindJumps(box);
+}
+$('clsFind').addEventListener('input',renderCls);
+
+/* ---------- KEC 검색 (원문 내장, 인터넷 불필요) ---------- */
+var KEC=null,KEC_LOADING=null;
+var KEC_QUICK=[['232.3.9','전압강하'],['142.3.2','보호도체'],['212.4.1','과부하 보호 협조'],['232.5','허용전류'],['232.41','케이블트레이공사'],['211.2.4','누전차단기'],['234.5','콘센트'],['142','접지시스템'],['151','피뢰시스템'],['522','태양광설비']];
+function loadKEC(){
+  if(KEC)return Promise.resolve(KEC);
+  if(KEC_LOADING)return KEC_LOADING;
+  KEC_LOADING=(async function(){
+    if(!window.DecompressionStream)throw new Error('이 브라우저는 내장 원문 압축 해제를 지원하지 않습니다. 크롬·엣지·삼성인터넷 최신 버전으로 열어 주세요.');
+    var src=$('kecData')?$('kecData').textContent:window.KEC_B64;
+    if(!src){await new Promise(function(ok,no){var s=document.createElement('script');s.src='kec-data.js';s.onload=ok;s.onerror=function(){no(new Error('KEC 원문 파일(kec-data.js)을 불러오지 못했습니다.'))};document.head.appendChild(s)});src=window.KEC_B64}
+    var b64=src.replace(/\s+/g,''),bin=atob(b64),u=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+    var st=new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'));
+    var d=JSON.parse(await new Response(st).text());
+    d.idx={};d.c.forEach(function(c,i){d.idx[c.n]=i;c.T=c.t.toLowerCase().replace(/\s+/g,'');c.L=c.b.toLowerCase().replace(/\s+/g,'')});
+    KEC=d;return d;
+  })();
+  KEC_LOADING.catch(function(){KEC_LOADING=null});
+  return KEC_LOADING;
+}
+function openKEC(n){S.kSel=n;S.tab='kec';renderTabs();window.scrollTo({top:0})}
+function hl(text,terms){
+  var h=esc(text);
+  terms.forEach(function(t){if(!t)return;var re=new RegExp(t.split('').map(function(ch){return ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}).join('\\s*'),'gi');h=h.replace(re,function(m){return '<mark>'+m+'</mark>'})});
+  return h;
+}
+function renderKEC(){
+  var box=$('v-kec');
+  if(!$('kecQ')){
+    box.innerHTML='<div class="card"><h2>📖 한국전기설비규정(KEC) 검색</h2><div class="mini" id="kecVer">원문을 여는 중…</div>'+
+      '<div class="cls-top" style="margin-top:10px"><input id="kecQ" type="text" placeholder="조항번호(232.3.9) 또는 낱말(전압강하, 케이블트레이, 누전차단기)" aria-label="KEC 검색"></div>'+
+      '<div class="chips" id="kecQuick" style="margin-top:8px"></div></div><div id="kecOut"></div>';
+    $('kecQ').addEventListener('input',function(){S.kSel=null;S.kq=this.value;kecResults()});
+    $('kecQuick').innerHTML=KEC_QUICK.map(function(q){return '<button type="button" class="chip" data-kec="'+q[0]+'">'+q[0]+' '+q[1]+'</button>'}).join('');
+    bindJumps($('kecQuick'));
+  }
+  loadKEC().then(function(d){
+    $('kecVer').textContent=d.title+' '+d.ver+' · 조항 '+d.c.length.toLocaleString()+'개 · 출처: '+d.src+'. 이 파일 안에 들어 있어 인터넷 없이 검색됩니다.';
+    if(S.kSel)kecDetail(S.kSel);else kecResults();
+  },function(e){$('kecOut').innerHTML='<div class="banner warn">'+esc(e.message||String(e))+'</div>'});
+}
+function kecTerms(q){return q.toLowerCase().split(/\s+/).filter(Boolean).map(function(t){return t})}
+function kecResults(){
+  var out=$('kecOut'),q=($('kecQ').value||'').trim();if(!KEC)return;
+  if(!q){out.innerHTML='<div class="card empty2">위 칸에 조항번호나 낱말을 넣거나, 자주 보는 조항을 누르세요.<br><span class="mini">여러 낱말은 띄어 쓰면 모두 들어간 조항만 찾습니다. 수식·그림은 원문에서 빠질 수 있으니 원문 쪽 번호로 확인하세요.</span></div>';return}
+  var res=[];
+  if(/^\d{3}(\.\d+)*$/.test(q)){
+    KEC.c.forEach(function(c){if(c.n===q||c.n.indexOf(q+'.')===0)res.push({c:c,s:c.n===q?1e6:1})});
+  }else{
+    var terms=kecTerms(q).map(function(t){return t.replace(/\s+/g,'')});
+    KEC.c.forEach(function(c){
+      var ok=true,s=0;
+      terms.forEach(function(t){var inT=c.T.indexOf(t)>=0,cnt=c.L.split(t).length-1;if(!inT&&!cnt)ok=false;s+=(inT?50:0)+Math.min(cnt,20)});
+      if(ok)res.push({c:c,s:s});
+    });
+    res.sort(function(a,b){return b.s-a.s});
+  }
+  var terms2=kecTerms(q),h='<div class="mini" style="margin:2px 4px 8px">'+res.length+'개 조항'+(res.length>80?' (상위 80개 표시)':'')+'</div><div class="list">';
+  res.slice(0,80).forEach(function(r){
+    var c=r.c,snip='';
+    if(!/^\d/.test(q)){var t=terms2[0],raw=c.b,ix=raw.toLowerCase().indexOf(t);if(ix<0)ix=0;snip=raw.slice(Math.max(0,ix-50),ix+110).replace(/\s+/g,' ')}
+    else snip=c.b.slice(0,140).replace(/\s+/g,' ');
+    h+='<button type="button" class="card kres" data-k="'+c.n+'"><div class="ch"><span class="no">'+c.n+'</span><b>'+hl(c.t,terms2)+'</b><span class="mini">원문 '+(c.p||'-')+'쪽</span></div><div class="cs" style="margin:4px 0 0">'+hl(snip,terms2)+'…</div></button>';
+  });
+  h+='</div>';if(!res.length)h='<div class="card empty2">찾는 조항이 없습니다. 낱말을 줄이거나 다르게 써 보세요.</div>';
+  out.innerHTML=h;
+  out.querySelectorAll('[data-k]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k;kecDetail(b.dataset.k);window.scrollTo({top:0})})});
+}
+function kecDetail(n){
+  var out=$('kecOut'),i=KEC.idx[n];
+  if(i==null){var alt=KEC.c.filter(function(c){return c.n.indexOf(n+'.')===0})[0];if(alt)i=KEC.idx[alt.n]}
+  if(i==null){out.innerHTML='<div class="card empty2">'+esc(n)+' 조항을 찾지 못했습니다.</div>';return}
+  var c=KEC.c[i],terms=kecTerms(($('kecQ').value||'').trim()).filter(function(t){return !/^\d/.test(t)});
+  var parent=c.n.indexOf('.')>0?c.n.replace(/\.\d+$/,''):null,kids=KEC.c.filter(function(x){return x.n.indexOf(c.n+'.')===0&&x.n.split('.').length===c.n.split('.').length+1});
+  var h='<div class="card"><div class="ch"><span class="no">KEC '+c.n+'</span><b style="font-size:17px">'+esc(c.t)+'</b><span class="mini">원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)</span></div>'+
+    '<div class="chips" style="margin:10px 0">'+(($('kecQ').value||'').trim()?'<button type="button" class="chip" id="kBack">← 검색 결과</button>':'')+
+    (i>0?'<button type="button" class="chip" data-k2="'+KEC.c[i-1].n+'">◀ '+KEC.c[i-1].n+'</button>':'')+
+    (parent&&KEC.idx[parent]!=null?'<button type="button" class="chip" data-k2="'+parent+'">↑ '+parent+'</button>':'')+
+    (i<KEC.c.length-1?'<button type="button" class="chip" data-k2="'+KEC.c[i+1].n+'">'+KEC.c[i+1].n+' ▶</button>':'')+
+    '<button type="button" class="chip" id="kCopy">복사</button></div>'+
+    '<div class="kecb">'+(c.b?hl(c.b,terms):'<span class="mini">(이 조항은 제목만 있고 내용은 아래 세부 조항에 있습니다)</span>')+'</div>';
+  if(kids.length)h+='<div class="mini" style="margin-top:12px">세부 조항</div><div class="chips" style="margin-top:6px">'+kids.map(function(k){return '<button type="button" class="chip" data-k2="'+k.n+'">'+k.n+' '+esc(k.t)+'</button>'}).join('')+'</div>';
+  h+='</div>';
+  out.innerHTML=h;
+  out.querySelectorAll('[data-k2]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k2;kecDetail(b.dataset.k2);window.scrollTo({top:0})})});
+  var kb=$('kBack');if(kb)kb.addEventListener('click',function(){S.kSel=null;kecResults()});
+  $('kCopy').addEventListener('click',function(){var t='KEC '+c.n+' '+c.t+'\n'+c.b;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast('조항을 복사했습니다.')},function(){toast('복사하지 못했습니다.')});});
+}
+
+/* ---------- 배관·트레이 화면 ---------- */
+var OD_NAMES={CV1:'CV·F-CV 단심',CV2:'CV 2심',CV3:'CV 3심',CV4:'CV 4심',GV:'GV·F-GV(접지)',HFIX:'HFIX 절연전선'};
+function odGrid(s){
+  return Object.keys(OD_NAMES).map(function(k){var t=s.od[k]||{};return '<div class="mini" style="margin-top:6px">'+OD_NAMES[k]+'</div><div class="amp">'+Object.keys(t).sort(function(a,b){return a-b}).map(function(z){return '<label>'+z+'㎟<input type="number" step="0.1" data-od="'+k+':'+z+'" value="'+t[z]+'"></label>'}).join('')+'</div>'}).join('');
+}
+function condKV(cd){
+  if(!cd)return '';
+  var cl=cd.fill==null?'':(cd.fill>cd.lim?'warn':'ok');
+  return '<div>배관 '+esc((cd.type?cd.type+' ':'')+cd.size)+'호 충전율<b class="'+cl+'">'+(cd.fill!=null?fnum(cd.fill,1)+'%':'-')+'</b><span style="font-size:10.5px">기준 '+cd.lim+'% · '+cd.count+'가닥</span></div>';
+}
+function wireCard(o){
+  var h='<div class="card cab sev-'+o.sev+'"><div class="ch"><span class="no">'+(o.no?shNo(o.no):o.page+'쪽')+' #'+o.row+'</span><b>'+esc(o.cable)+'</b>'+badge(o.sev)+'</div><div class="cs">'+esc(o.route||'')+'</div><div class="kv">'+condKV(o.conduit)+'</div>';
+  if(o.findings.length)h+='<ul class="fl">'+o.findings.map(function(f){return '<li class="'+f.sev+'">'+SEV_I[f.sev]+' '+lk(f.t)+'</li>'}).join('')+'</ul>';
+  return h+'<div style="margin-top:8px">'+jumpBtn(o.page)+'</div></div>';
+}
+function trayHtml(){
+  var T=S.set.trays||[],R=S.rev.trays||[],sizes=Object.keys(S.an.trays||{});
+  var h='<div class="card"><h2>🧺 케이블트레이 적정성 '+lk('(KEC 232.41.1)')+'</h2><div class="mini">트레이 구간을 만들고, 그 구간을 지나가는 간선을 체크하세요. 케이블 바깥지름 합계가 트레이 내측폭 이하(단층 포설)인지, 저압·고압이 섞였는지 봅니다. 어떤 간선이 어느 트레이로 가는지는 도면 글자만으로 알 수 없어 직접 고릅니다.</div>'+
+    (sizes.length?'<div class="mini" style="margin-top:8px">도면에서 찾은 트레이 규격: '+sizes.map(function(k){return '<b>'+k+'</b> ('+S.an.trays[k].slice(0,4).map(function(p){return p+'쪽'}).join(', ')+(S.an.trays[k].length>4?' 외':'')+')'}).join(' · ')+'</div>':'')+
+    '<div class="chips" style="margin-top:10px">'+(sizes.length?sizes.map(function(k){return '<button type="button" class="chip" data-addtray="'+k+'">+ '+k+' 구간 추가</button>'}).join(''):'')+'<button type="button" class="chip" data-addtray="">+ 직접 입력 구간</button></div></div>';
+  T.forEach(function(t,i){
+    var r=R[i]||{sum:0,findings:[],sev:'ok'},W=parseFloat(t.w)||0,pct=W?Math.min(100,r.sum/W*100):0,cl=r.sum>W?'bad':(r.sum>W*0.9?'warn':'ok');
+    h+='<div class="card cab sev-'+(r.n?r.sev:'info')+'"><div class="ch"><input type="text" data-tn="'+i+'" value="'+esc(t.name||'')+'" placeholder="구간 이름(예: 1층 복도 주트레이)" style="flex:1 1 160px;min-height:36px">'+(r.n?badge(r.sev):'<span class="badge info">간선 선택 전</span>')+'<button type="button" data-tdel="'+i+'">삭제</button></div>'+
+      '<div class="vdin" style="margin-top:8px"><label>내측폭 <input type="number" data-tw="'+i+'" value="'+(t.w||'')+'"> mm</label><label>단심 포설 <select data-tl="'+i+'"><option value="flat"'+(t.lay!=='tri'?' selected':'')+'>단층 나란히</option><option value="tri"'+(t.lay==='tri'?' selected':'')+'>삼각(트레포일)</option></select></label><button type="button" data-tall="'+i+'">트레이 경유 간선 모두 체크</button><button type="button" data-tnone="'+i+'">모두 해제</button></div>'+
+      '<div class="gauge"><i class="'+cl+'" style="width:'+pct+'%"></i><span>바깥지름 합계 '+fnum(r.sum,0)+'mm / 내측폭 '+(W||'-')+'mm · 간선 '+(r.n||0)+'개</span></div>';
+    if(r.findings&&r.findings.length)h+='<ul class="fl">'+r.findings.map(function(f){return '<li class="'+f.sev+'">'+SEV_I[f.sev]+' '+lk(f.t)+'</li>'}).join('')+'</ul>';
+    h+='<details style="margin-top:8px"'+(r.n?'':' open')+'><summary class="mini" style="cursor:pointer">간선 고르기</summary><div class="tchk">'+
+      S.an.sched.filter(function(x){return x.cable&&x.cable.size}).map(function(x){var on=t.rows&&t.rows[x.no];return '<label><input type="checkbox" data-tr="'+i+':'+x.no+'"'+(on?' checked':'')+'> <b>#'+x.no+'</b> '+esc(x.to||'')+' ← '+esc(x.from||'')+' <span class="mini">'+esc(x.cableTxt||'')+'</span></label>'}).join('')+'</div></details></div>';
+  });
+  if(!T.length)h+='<div class="card empty2">아직 만든 트레이 구간이 없습니다. 위 버튼으로 추가하세요.</div>';
+  return h;
+}
+function bindTray(box){
+  function save(){saveIn();runReview()}
+  box.querySelectorAll('[data-addtray]').forEach(function(b){b.addEventListener('click',function(){var k=b.dataset.addtray,w=k?parseInt(k,10):'';S.set.trays.push({name:k?'트레이 '+k:'',w:w,lay:'flat',rows:{}});save()})});
+  box.querySelectorAll('[data-tdel]').forEach(function(b){b.addEventListener('click',function(){S.set.trays.splice(+b.dataset.tdel,1);save()})});
+  box.querySelectorAll('[data-tn]').forEach(function(i){i.addEventListener('change',function(){S.set.trays[+i.dataset.tn].name=i.value;saveIn()})});
+  box.querySelectorAll('[data-tw]').forEach(function(i){i.addEventListener('change',function(){S.set.trays[+i.dataset.tw].w=parseFloat(i.value)||'';save()})});
+  box.querySelectorAll('[data-tl]').forEach(function(i){i.addEventListener('change',function(){S.set.trays[+i.dataset.tl].lay=i.value;save()})});
+  box.querySelectorAll('[data-tr]').forEach(function(i){i.addEventListener('change',function(){var a=i.dataset.tr.split(':'),t=S.set.trays[+a[0]];t.rows=t.rows||{};if(i.checked)t.rows[a[1]]=true;else delete t.rows[a[1]];save()})});
+  box.querySelectorAll('[data-tall]').forEach(function(b){b.addEventListener('click',function(){var t=S.set.trays[+b.dataset.tall];t.rows={};S.an.sched.forEach(function(x){if(x.cable&&x.cable.size&&/TRAY/i.test((x.tray||'')+' '+(x.cableTxt||'')))t.rows[x.no]=true});save()})});
+  box.querySelectorAll('[data-tnone]').forEach(function(b){b.addEventListener('click',function(){S.set.trays[+b.dataset.tnone].rows={};save()})});
+}
+
+$('pageSel').addEventListener('change',function(){var v=parseInt(this.value,10);if(v){S.userPicked=true;loadPage(v)}});
+$('pgPrev').addEventListener('click',function(){if(S.pdf&&S.pageNum>1)loadPage(S.pageNum-1)});
+$('pgNext').addEventListener('click',function(){if(S.pdf&&S.pageNum<S.pdf.numPages)loadPage(S.pageNum+1)});
+
+/*AL-START*/
+/* ===== 범례(전등표 등) 자동 인식: 'TYPE'·'심벌'·'수량' 머리글이 있는 표에서 줄마다 심벌을 잘라 도면 전체에서 찾는다 ===== */
+function findLegends(texts){
+  var out=[];
+  var syms=texts.filter(function(t){return /^\s*(심\s*벌|기\s*호|SYMBOL)\s*$/i.test(t.s)});
+  syms.forEach(function(sh){
+    var row=texts.filter(function(t){return t!==sh&&Math.abs(t.y-sh.y)<4});
+    var typeH=row.filter(function(t){return t.x<sh.x&&/TYPE|구\s*분|타\s*입|종\s*류|기\s*호|명\s*칭/i.test(t.s)}).sort(function(a,b){return b.x-a.x})[0];
+    var qtyH=row.filter(function(t){return t.x>sh.x&&/수\s*량|개\s*수|QTY/i.test(t.s)}).sort(function(a,b){return a.x-b.x})[0];
+    var right=row.filter(function(t){return t.x>sh.x+5}).sort(function(a,b){return a.x-b.x});
+    var nextH=right[0];
+    if(!typeH||!nextH)return;
+    var descH=right.filter(function(t){return t!==qtyH});
+    /* TYPE 열 글자: 머리글 아래, x가 TYPE 머리글 근처 */
+    var col=texts.filter(function(t){return t.y>sh.y+5&&t.y<sh.y+400&&t.x>typeH.x-25&&t.x<sh.x-8&&t.s.trim().length<=14});
+    col.sort(function(a,b){return a.y-b.y});
+    var rows=[],lastY=sh.y;
+    for(var i=0;i<col.length;i++){if(col[i].y-lastY>45)break;rows.push(col[i]);lastY=col[i].y}
+    if(rows.length<1)return;
+    var symL=(typeH.x+sh.x)/2+ (sh.x-typeH.x)*0.15, symR=sh.x+(nextH.x-sh.x)*0.78;
+    var items=rows.map(function(r,i){
+      var prev=i?rows[i-1].y:sh.y+4,next=i<rows.length-1?rows[i+1].y:r.y+(r.y-prev);
+      var top=(prev+r.y)/2-3,bot=(r.y+next)/2-3;
+      var same=texts.filter(function(t){return Math.abs(t.y-r.y)<4&&t.x>symR-2});
+      var q=qtyH?same.filter(function(t){return Math.abs(t.x-qtyH.x)<25&&/^\d+$/.test(t.s.trim())})[0]:null;
+      var desc=same.filter(function(t){return !q||t!==q}).sort(function(a,b){return a.x-b.x}).map(function(t){return t.s.trim()}).join(' ');
+      return {type:r.s.trim(),desc:desc,qty:q?parseInt(q.s,10):null,box:[symL,top,symR,bot]};
+    });
+    var last=rows[rows.length-1];
+    out.push({head:sh,typeH:typeH,qtyH:qtyH,items:items,bbox:[typeH.x-30,sh.y-15,(qtyH||nextH).x+60,last.y+15]});
+  });
+  return out;
+}
+function legendTemplate(box){
+  var x0=box[0],y0=box[1],x1=box[2],y1=box[3],W=x1-x0,H=y1-y0;
+  var sel=S.D.filter(function(s){return s.bx0>=x0&&s.bx1<=x1&&s.by0>=y0&&s.by1<=y1&&!(s.w>W*0.85)&&!(s.h>H*0.85)});
+  return sel;
+}
+function groupFromSegs(sel,name,k){
+  k=k||1;
+  if(!sel.length)return null;
+  var X0=1e9,Y0=1e9,X1=-1e9,Y1=-1e9;
+  sel.forEach(function(s){X0=Math.min(X0,s.bx0);Y0=Math.min(Y0,s.by0);X1=Math.max(X1,s.bx1);Y1=Math.max(Y1,s.by1)});
+  var cx=(X0+X1)/2,cy=(Y0+Y1)/2;
+  var tmpl=sel.map(function(s){var r=[];for(var i=0;i<s.p.length;i+=2){r.push((s.p[i]-cx)*k,(s.p[i+1]-cy)*k)}return r});
+  return {name:name,k:k,tmpl:tmpl,cx:cx,cy:cy,tw:(X1-X0)*k,th:(Y1-Y0)*k,hits:[],manual:[],show:true,expected:''};
+}
+/* 범례 심벌과 도면 심벌의 축척 비율 찾기: 범례 심벌의 가장 긴 선과 같은 방향·비례 길이의 선이 도면에 많은 비율을 후보로 시험 */
+function legendScale(sel,excl){
+  var a=null;sel.forEach(function(s){if(!a||s.w+s.h>a.w+a.h)a=s});if(!a)return [];
+  var hor=a.h<a.w,la=Math.max(a.w,a.h),hist={};
+  S.D.forEach(function(s){
+    if(excl&&s.cx>excl[0]&&s.cx<excl[2]&&s.cy>excl[1]&&s.cy<excl[3])return;
+    var ratio=hor?(s.h/(s.w||1e-9)):(s.w/(s.h||1e-9)),ar=hor?(a.h/(a.w||1e-9)):(a.w/(a.h||1e-9));
+    if(Math.abs(ratio-ar)>0.08)return;
+    var L=Math.max(s.w,s.h),k=L/la;if(k<0.15||k>2.5)return;
+    var key=Math.round(k*200)/200;hist[key]=(hist[key]||0)+1;
+  });
+  return Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).filter(function(o){return o.n>=2}).sort(function(x,y){return y.n-x.n}).slice(0,25).map(function(o){return o.k});
+}
+function bestScale(sel,name,excl){
+  var best={k:1,n:0,hits:[]};
+  legendScale(sel,excl).forEach(function(k){
+    var g=groupFromSegs(sel,name,k),h=findHits(g).filter(function(p){return !(excl&&p.x>excl[0]&&p.x<excl[2]&&p.y>excl[1]&&p.y<excl[3])});
+    if(h.length>best.n)best={k:k,n:h.length,hits:h};
+  });
+  return best;
+}
+/*AL-END*/
+
+/* ===================== 도면 중심 자동 분석 ===================== */
+var AUTO_COL=['#e8590c','#1c7ed6','#2f9e44','#c2255c','#7048e8','#0b7285','#e67700','#5c940d','#d6336c','#1098ad','#862e9c','#364fc7','#a61e4d','#087f5b'];
+var SIZE_COL=[[240,'#c92a2a'],[150,'#e8590c'],[120,'#f08c00'],[95,'#e67700'],[70,'#5c940d'],[50,'#2b8a3e'],[35,'#0b7285'],[25,'#1971c2'],[16,'#3b5bdb'],[10,'#7048e8'],[6,'#ae3ec9'],[4,'#c2255c'],[0,'#868e96']];
+function sizeColor(sz){for(var i=0;i<SIZE_COL.length;i++)if(sz>=SIZE_COL[i][0])return SIZE_COL[i][1];return '#868e96'}
+S.auto={mode:null};S.tplCache={};S.kCache={};
+function autoReset(){S.auto={mode:null};S.groups=S.groups.filter(function(g){return !g.auto});S.assign=null}
+function sleep0(){return new Promise(function(r){setTimeout(r,0)})}
+async function autoPage(){
+  var pn=S.pageNum;autoReset();renderAutoPanel();
+  var L=findLegends(S.texts);
+  if(L.length){await runLegend(L,pn);return}
+  var brk=pageBreakers();
+  if(brk.length>=4&&S.texts.some(function(t){return /설치위치|FROM\s*TO/.test(t.s)})){S.auto={mode:'panel',brk:brk,sel:null};renderAutoPanel();draw();return}
+  var cab=pageCables();
+  if(cab&&cab.tags.length>=3){S.auto=cab;renderAutoPanel();draw();return}
+  renderAutoPanel();
+}
+/* ---------- 1. 전등표(범례) 자동 집계 ---------- */
+function legendSig(lg){return lg.items.map(function(i){return i.type+':'+i.desc}).join('|')}
+function cntHits(g,ex){return findHits(g).filter(function(h){return !ex.some(function(b){return h.x>b[0]&&h.x<b[2]&&h.y>b[1]&&h.y<b[3]})})}
+async function runLegend(L,pn){
+  S.auto={mode:'legend',busy:true,L:L,items:[]};renderAutoPanel();
+  var ex=L.map(function(l){return l.bbox}),ci=0;
+  for(var li=0;li<L.length;li++){
+    var lg=L[li],sig=legendSig(lg);
+    var tm=lg.items.map(function(it){return {it:it,sel:legendTemplate(it.box)}});
+    /* 범례 → 도면 축척 비율(k): 모양이 복잡한 심벌들로 찾는다 */
+    var k=S.kCache[sig];
+    if(!k){
+      var score={},cands=tm.filter(function(x){return x.sel.length>=4&&x.sel.length<=80&&x.sel.some(function(s){return s.p.length===4})}).slice(0,6);
+      for(var c=0;c<cands.length;c++){
+        var ks=legendScale(cands[c].sel,lg.bbox).slice(0,12);
+        for(var j=0;j<ks.length;j++){var n=cntHits(groupFromSegs(cands[c].sel,'t',ks[j]),ex).length;if(n){score[ks[j]]=(score[ks[j]]||0)+1+Math.min(n,200)/1000}}
+        setStatus('전등표 축척 찾는 중… '+(c+1)+'/'+cands.length);await sleep0();if(S.pageNum!==pn)return;
+      }
+      var bs=0;for(var kk in score)if(score[kk]>bs){bs=score[kk];k=parseFloat(kk)}
+      if(k)S.kCache[sig]=k;
+    }
+    for(var t=0;t<tm.length;t++){
+      var it=tm[t].it,sel=tm[t].sel,key=it.type+'|'+it.desc,g=null,status='none',hits=[];
+      var name=it.type+(it.desc?' · '+it.desc:'');
+      if(S.tplCache[key]){var tc=S.tplCache[key];g={tmpl:tc.tmpl,tw:tc.tw,th:tc.th,cx:0,cy:0,k:1};hits=cntHits(g,ex);status=hits.length?'manual':'none'}
+      else if(sel.length&&k){
+        var best=null;[1,0.98,1.02,0.96,1.04].forEach(function(f){var gg=groupFromSegs(sel,name,k*f),h=cntHits(gg,ex);if(!best||h.length>best.h.length)best={g:gg,h:h}});
+        g=best.g;hits=best.h;status=hits.length?'auto':'none';
+        if(!hits.length){ /* 자기 비율로 추정 */
+          var own=legendScale(sel,lg.bbox).slice(0,8),b2=null;
+          own.forEach(function(kk){var gg=groupFromSegs(sel,name,kk),h=cntHits(gg,ex);if(h.length&&(!b2||Math.abs(h.length-(it.qty||0))<Math.abs(b2.h.length-(it.qty||0))))b2={g:gg,h:h}});
+          if(b2){g=b2.g;hits=b2.h;status='guess'}
+        }
+      }
+      var simple=sel.length&&sel.length<=2&&sel.every(function(s){return s.p.length===4});
+      var grp={id:Date.now()+Math.random(),auto:true,name:name,type:it.type,desc:it.desc,qty:it.qty,status:status,simple:simple,
+        color:AUTO_COL[ci++%AUTO_COL.length],expected:it.qty==null?'':String(it.qty),
+        tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:status!=='guess'||true,key:key,legend:li};
+      S.groups.push(grp);S.auto.items.push(grp);
+      if(t%2===1){setStatus('전등 자동 집계 중… '+it.type);renderAutoPanel();draw();await sleep0();if(S.pageNum!==pn)return}
+    }
+  }
+  S.auto.busy=false;setStatus('자동 집계 완료 · '+(S.pageName||S.pageNum+'쪽'));renderAutoPanel();renderSum();draw();
+}
+function assignFromBox(x0,y0,x1,y1){
+  var g=S.groups.filter(function(x){return x.id===S.assign})[0];S.assign=null;
+  if(!g){return}
+  var minx=Math.min(x0,x1),maxx=Math.max(x0,x1),miny=Math.min(y0,y1),maxy=Math.max(y0,y1);
+  var sel=S.D.filter(function(s){return s.bx0>=minx&&s.bx1<=maxx&&s.by0>=miny&&s.by1<=maxy});
+  if(!sel.length){toast('네모 안에 심벌 선이 없습니다. 심벌 전체가 들어오게 다시 감싸 주세요.');return}
+  var ng=groupFromSegs(sel,g.name,1),ex=(S.auto.L||[]).map(function(l){return l.bbox});
+  g.tmpl=ng.tmpl;g.tw=ng.tw;g.th=ng.th;g.manual=[];
+  g.hits=cntHits(g,ex).map(function(h){return {x:h.x,y:h.y,off:false}});g.status='manual';
+  S.tplCache[g.key]={tmpl:g.tmpl,tw:g.tw,th:g.th};
+  setMode('pan');renderAutoPanel();renderSum();draw();
+  toast(g.type+'형을 '+g.hits.length+'개 찾았습니다'+(g.qty!=null?' (표 '+g.qty+'개)':'')+'. 다른 층 도면에도 이 모양을 씁니다.',4200);
+}
+/* ---------- 2. 분전반 결선도: 차단기 위치·종류 ---------- */
+var BRK_CAT={MCCB:['배선용(MCCB)','#1c7ed6'],MCB:['소형(MCB)','#0b7285'],LEAK:['누전(RCBO·CBR·ELCB)','#e8590c'],ACB:['기중(ACB)','#7048e8'],ETC:['기타','#868e96']};
+function brkCat(t){return /RCBO|CBR|ELCB|ELB/.test(t)?'LEAK':(/MCCB/.test(t)?'MCCB':(/MCB/.test(t)?'MCB':(/ACB/.test(t)?'ACB':'ETC')))}
+function pageBreakers(){
+  var out=[];
+  S.texts.forEach(function(t){
+    var b=parseBreaker(t.s);if(!b)return;
+    if(!b.type){var up=S.texts.filter(function(u){var dy=t.y-u.y;return u!==t&&dy>0&&dy<16&&Math.abs(u.x-t.x)<14&&/^(MCCB|MCB|RCBO|CBR|ELCB|ELB|ACB)\b/.test(u.s)})[0];
+      if(up){var m=up.s.match(/^(MCCB|MCB|RCBO|CBR|ELCB|ELB|ACB)\s*([1-4])?/);b.type=m[1];if(m[2])b.poles=parseInt(m[2],10)}}
+    b.x=t.x;b.y=t.y;b.w=t.w||t.s.length*t.z*0.55;b.z=t.z;b.cat=brkCat(b.type);
+    b.key=(b.type||'?')+' '+(b.poles?b.poles+'P ':'')+b.af+'AF/'+b.at+'AT';
+    out.push(b);
+  });
+  return out;
+}
+function brkTable(list){
+  var m={};list.forEach(function(b){var k=b.key;(m[k]||(m[k]={key:k,cat:b.cat,type:b.type,poles:b.poles,af:b.af,at:b.at,n:0})).n++});
+  return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return (a.type>b.type?1:a.type<b.type?-1:0)||b.poles-a.poles||b.af-a.af||b.at-a.at});
+}
+/* ---------- 3. 간선 평면도: 케이블 번호 표기 ---------- */
+function pageCables(){
+  if(!S.an||!S.an.sched||!S.an.sched.length)return null;
+  var byNo={};S.an.sched.forEach(function(r){byNo[r.no]=r});
+  var spec=S.texts.filter(function(t){return /㎟|sq\b/.test(t.s)});
+  var bb=null;if(spec.length>=5){bb=[1e9,1e9,-1e9,-1e9];spec.forEach(function(t){bb[0]=Math.min(bb[0],t.x-30);bb[1]=Math.min(bb[1],t.y-10);bb[2]=Math.max(bb[2],t.x+(t.w||80)+120);bb[3]=Math.max(bb[3],t.y+8)})}
+  var nums=S.texts.filter(function(t){return /^\d{1,2}$/.test(t.s.trim())&&byNo[parseInt(t.s,10)]&&!(bb&&t.x>bb[0]&&t.x<bb[2]&&t.y>bb[1]&&t.y<bb[3])});
+  if(!nums.length)return null;
+  var zc={};nums.forEach(function(t){var k=t.z.toFixed(1);zc[k]=(zc[k]||0)+1});
+  var zb=null,zn=0;for(var k in zc)if(zc[k]>zn){zn=zc[k];zb=parseFloat(k)}
+  var tags=nums.filter(function(t){return Math.abs(t.z-zb)<0.25}).map(function(t){var r=byNo[parseInt(t.s,10)];return {no:r.no,x:t.x,y:t.y,z:t.z,w:t.w||t.z,row:r,color:sizeColor(r.cable?r.cable.size:0)}});
+  var keys={};S.an.sched.forEach(function(r){keys[panelKey(r.from)]=1;toList(r.to).forEach(function(k){keys[k]=1})});(S.an.panels||[]).forEach(function(p){keys[keyFromName(p.name)]=1});
+  var labels=S.texts.filter(function(t){var k=panelKey(t.s);return t.s.length<20&&keys[k]&&!(bb&&t.x>bb[0]&&t.x<bb[2]&&t.y>bb[1]&&t.y<bb[3])}).map(function(t){return {k:panelKey(t.s),x:t.x,y:t.y,z:t.z,w:t.w||40}});
+  var trays=S.texts.filter(function(t){return /TRAY\s*\d{2,4}\s*[*xX×]/.test(t.s)}).map(function(t){return {s:t.s,x:t.x,y:t.y,z:t.z,w:t.w||60}});
+  return {mode:'cable',tags:tags,labels:labels,trays:trays,bb:bb,sel:null};
+}
+/* ---------- 도면 위 그리기 ---------- */
+function paintAuto(ctx,k){
+  var A=S.auto;if(!A||!A.mode)return;
+  if(A.mode==='panel'){
+    A.brk.forEach(function(b){
+      var c=BRK_CAT[b.cat][1],on=A.sel&&A.sel===b.key;
+      if(A.sel&&!on)return;
+      ctx.fillStyle=c+'33';ctx.strokeStyle=c;ctx.lineWidth=Math.max(0.4,(on?2.2:1.2)/k);
+      ctx.fillRect(b.x-1,b.y-b.z-1,b.w+2,b.z*1.35+2);ctx.strokeRect(b.x-1,b.y-b.z-1,b.w+2,b.z*1.35+2);
+    });
+  }else if(A.mode==='cable'){
+    var sel=A.sel;
+    A.trays.forEach(function(t){ctx.strokeStyle='#7048e8';ctx.setLineDash([3/k,2/k]);ctx.lineWidth=Math.max(0.4,1.2/k);ctx.strokeRect(t.x-1.5,t.y-t.z-1.5,t.w+3,t.z*1.4+3);ctx.setLineDash([])});
+    A.tags.forEach(function(t){
+      if(sel&&t.no!==sel)return;
+      var r=Math.max(t.z*0.95,t.w*0.75)+(sel?1.5:0.6),cx=t.x+t.w/2,cy=t.y-t.z*0.35;
+      ctx.beginPath();ctx.arc(cx,cy,r,0,6.2832);ctx.fillStyle=t.color+(sel?'55':'40');ctx.fill();
+      ctx.strokeStyle=t.color;ctx.lineWidth=Math.max(0.5,(sel?2.6:1.4)/k);ctx.stroke();
+    });
+    if(sel){
+      var row=(S.an.sched.filter(function(r){return r.no===sel})[0])||null;
+      if(row){
+        var fk=panelKey(row.from),tks=toList(row.to),col=sizeColor(row.cable?row.cable.size:0);
+        var F=A.labels.filter(function(l){return l.k===fk}),T=A.labels.filter(function(l){return tks.indexOf(l.k)>=0});
+        [F,T].forEach(function(arr,ii){arr.forEach(function(l){ctx.strokeStyle=col;ctx.lineWidth=Math.max(0.6,2.4/k);ctx.strokeRect(l.x-2,l.y-l.z-2,l.w+4,l.z*1.4+4);ctx.fillStyle=col;ctx.font='bold '+Math.max(5,11/k)+'px sans-serif';ctx.fillText(ii?'TO':'FROM',l.x,l.y-l.z-3/k)})});
+        if(F.length&&T.length){var best=null;F.forEach(function(a){T.forEach(function(b){var d=Math.hypot(a.x-b.x,a.y-b.y);if(!best||d<best.d)best={a:a,b:b,d:d}})});
+          ctx.strokeStyle=col;ctx.setLineDash([6/k,4/k]);ctx.lineWidth=Math.max(0.6,2/k);ctx.beginPath();ctx.moveTo(best.a.x+best.a.w/2,best.a.y-best.a.z/2);ctx.lineTo(best.b.x+best.b.w/2,best.b.y-best.b.z/2);ctx.stroke();ctx.setLineDash([])}
+      }
+    }
+  }
+}
+function zoomToPts(pts){
+  if(!pts.length)return;var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;pts.forEach(function(p){x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y)});
+  var r=stage.getBoundingClientRect(),w=Math.max(40,x1-x0)+60,h=Math.max(40,y1-y0)+60,z=Math.min(r.width/w,r.height/h,30);
+  S.view.z=Math.max(S.fitZ,z);centerOn((x0+x1)/2,(y0+y1)/2);
+}
+/* ---------- 오른쪽(폰은 아래) 결과 패널 ---------- */
+function stLabel(g){
+  var n=count(g);
+  if(g.status==='none'&&g.qty===0)return '<span class="badge ok">표 0 · 도면에도 없음</span>';
+  if(g.status==='none')return '<span class="badge bad">못 찾음 · 지정 필요</span>';
+  if(g.qty==null)return '<span class="badge info">표 수량 없음</span>';
+  var d=n-g.qty;
+  if(g.status==='guess')return '<span class="badge warn">추정 · 확인 필요</span>';
+  return d===0?'<span class="badge ok">일치</span>':'<span class="badge '+(Math.abs(d)<=2?'warn':'bad')+'">차이 '+(d>0?'+':'')+d+'</span>';
+}
+function renderAutoPanel(){
+  var box=$('autoPanel');if(!box)return;var A=S.auto,h='';
+  var manualP=$('manualPanels');if(manualP)manualP.hidden=!!(A&&A.mode==='legend');
+  if(!S.segs.length){box.innerHTML='<h2>자동 분석</h2><div class="empty">위에서 도면을 고르면, 그 도면 종류에 맞게 자동으로 분석합니다.<br>· 전등·전열 평면도 → 전등표를 읽어 타입별 개수<br>· 분전반 결선도 → 차단기 종류·용량별 수량<br>· 간선 평면도 → 케이블 번호를 규격별 색으로</div>';return}
+  if(!A||!A.mode){box.innerHTML='<h2>자동 분석</h2><div class="empty">이 도면에서는 전등표·차단기·간선 번호를 찾지 못했습니다. 아래 ‘심벌 지정’으로 직접 세거나 다른 도면을 고르세요.</div>';return}
+  if(A.mode==='legend'){
+    h='<h2>💡 전등표 자동 집계 '+(A.busy?'<span class="mini">(계산 중…)</span>':'')+'</h2>';
+    h+='<div class="atbl">';
+    A.items.forEach(function(g){
+      var n=count(g),act=S.active===g.id;
+      h+='<div class="arow'+(act?' act':'')+'" data-g="'+g.id+'"><span class="sw" style="background:'+g.color+'"></span><div class="an"><b>'+esc(g.type)+'형</b> <span class="mini">'+esc(g.desc||'')+'</span>'+(g.simple&&g.status!=='none'?'<div class="mini">선 하나 모양이라 다른 선이 섞일 수 있음</div>':'')+'</div>'+
+        '<div class="aq"><b>'+n+'</b><span class="mini">/ 표 '+(g.qty==null?'-':g.qty)+'</span></div>'+stLabel(g)+
+        '<div class="ab"><button type="button" data-go="'+g.id+'">보기</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
+    });
+    h+='</div><div class="mini" style="margin-top:8px">‘보기’를 누르면 그 타입만 강조됩니다. 틀린 동그라미는 ‘보정’ 모드에서 눌러 빼거나 더할 수 있어요. ‘지정’은 도면에서 그 심벌 하나를 네모로 감싸면 그 모양으로 다시 셉니다.</div>'+
+      '<div class="g3" style="margin-top:8px"><button type="button" id="aCopy">집계표 복사</button><button type="button" id="aAll">모두 보기</button></div>';
+    box.innerHTML=h;
+    box.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var id=+b.dataset.go;S.active=id;S.groups.forEach(function(g){g.show=!g.auto||g.id===id});var g=S.groups.filter(function(x){return x.id===id})[0];zoomToPts(g.hits.filter(function(x){return !x.off}));renderAutoPanel();draw()})});
+    box.querySelectorAll('[data-as]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();S.assign=+b.dataset.as;var g=S.groups.filter(function(x){return x.id===S.assign})[0];setMode('sel');toast('도면을 확대한 뒤, '+g.type+'형 심벌 하나를 네모로 감싸 주세요.',5000)})});
+    $('aAll').addEventListener('click',function(){S.groups.forEach(function(g){g.show=true});S.active=null;fitView();renderAutoPanel();draw()});
+    $('aCopy').addEventListener('click',function(){var rows=[['도면','타입','설명','찾은 수','표 수량','차이','상태']];A.items.forEach(function(g){var n=count(g);rows.push([S.pageName||S.pageNum,g.type,g.desc,n,g.qty==null?'':g.qty,g.qty==null?'':n-g.qty,{auto:'자동',manual:'지정',guess:'추정',none:'못 찾음'}[g.status]])});copyText(rows.map(function(r){return r.join('\t')}).join('\n'))});
+    return;
+  }
+  if(A.mode==='panel'){
+    var T=brkTable(A.brk),cats={};A.brk.forEach(function(b){cats[b.cat]=(cats[b.cat]||0)+1});
+    var pnls=(S.an&&S.an.panels||[]).filter(function(p){return p.page===S.pageNum});
+    h='<h2>🔌 이 쪽의 분전반·차단기</h2>';
+    if(pnls.length)h+='<div class="mini">'+pnls.map(function(p){return '<b>'+esc(p.name)+'</b> '+esc(p.loc||'')+(p.main?' · 인입 '+(p.main.type||'')+' '+p.main.af+'/'+p.main.at+'A':'')+' · 분기 '+p.br.length+' (예비 '+p.sp+')'}).join('<br>')+'</div>';
+    h+='<div class="chips" style="margin:8px 0">'+Object.keys(cats).map(function(c){return '<span class="chip" style="border-color:'+BRK_CAT[c][1]+';color:'+BRK_CAT[c][1]+'">■ '+BRK_CAT[c][0]+' '+cats[c]+'</span>'}).join('')+'</div>';
+    h+='<table class="sum"><tr><th>차단기</th><th class="n">수량</th></tr>'+T.map(function(r){return '<tr class="pk'+(A.sel===r.key?' act':'')+'" data-k="'+esc(r.key)+'"><td><span class="sw" style="display:inline-block;background:'+BRK_CAT[r.cat][1]+'"></span> '+esc(r.key)+'</td><td class="n">'+r.n+'</td></tr>'}).join('')+'<tr><td><b>합계</b></td><td class="n"><b>'+A.brk.length+'</b></td></tr></table>';
+    h+='<div class="g3" style="margin-top:8px"><button type="button" id="pAll">모두 보기</button><button type="button" id="pCopy">이 쪽 집계 복사</button><button type="button" id="pTotal">전체 분전반 집계 복사</button></div><div class="mini" style="margin-top:6px">표의 줄을 누르면 그 차단기만 도면에 표시됩니다.</div>';
+    box.innerHTML=h;
+    box.querySelectorAll('tr[data-k]').forEach(function(tr){tr.addEventListener('click',function(){A.sel=A.sel===tr.dataset.k?null:tr.dataset.k;zoomToPts(A.brk.filter(function(b){return !A.sel||b.key===A.sel}));renderAutoPanel();draw()})});
+    $('pAll').addEventListener('click',function(){A.sel=null;fitView();renderAutoPanel();draw()});
+    $('pCopy').addEventListener('click',function(){copyText([['도면','차단기','수량']].concat(T.map(function(r){return [S.pageName||S.pageNum,r.key,r.n]})).map(function(r){return r.join('\t')}).join('\n'))});
+    $('pTotal').addEventListener('click',copyAllPanels);
+    return;
+  }
+  if(A.mode==='cable'){
+    var g={};A.tags.forEach(function(t){(g[t.no]||(g[t.no]={row:t.row,n:0,color:t.color})).n++});
+    var nos=Object.keys(g).map(Number).sort(function(a,b){return a-b});
+    var sizes={};nos.forEach(function(n){var c=g[n].row.cable;if(c&&c.size)sizes[c.size]=1});
+    h='<h2>🧵 이 쪽의 간선 케이블</h2><div class="chips" style="margin-bottom:8px">'+Object.keys(sizes).map(Number).sort(function(a,b){return b-a}).map(function(s){return '<span class="chip" style="border-color:'+sizeColor(s)+';color:'+sizeColor(s)+'">● '+s+'㎟</span>'}).join('')+'<span class="chip" style="border-color:#7048e8;color:#7048e8">▭ 트레이 표기 '+A.trays.length+'</span></div>';
+    h+='<div class="atbl">'+nos.map(function(n){var r=g[n].row,rv=S.rev&&S.rev.cables.filter(function(c){return c.no===n})[0];
+      return '<div class="arow'+(A.sel===n?' act':'')+'" data-c="'+n+'"><span class="sw" style="background:'+g[n].color+'"></span><div class="an"><b>#'+n+'</b> '+esc((r.to||'')+' ← '+(r.from||''))+'<div class="mini">'+esc(r.cableTxt||'')+'</div></div><div class="aq"><b>'+g[n].n+'</b><span class="mini">곳</span></div>'+(rv?badge(rv.sev):'')+'</div>'}).join('')+'</div>';
+    h+='<div class="g3" style="margin-top:8px"><button type="button" id="cAll">모두 보기</button></div><div class="mini" style="margin-top:6px">줄을 누르면 그 케이블 번호와 FROM·TO 분전반이 도면에 표시됩니다. 판정 내용은 ‘간선·분전반 표’ 탭에 있어요.</div>';
+    box.innerHTML=h;
+    box.querySelectorAll('[data-c]').forEach(function(d){d.addEventListener('click',function(){var n=+d.dataset.c;A.sel=A.sel===n?null:n;var row=S.an.sched.filter(function(r){return r.no===n})[0],pts=A.tags.filter(function(t){return !A.sel||t.no===n});if(A.sel&&row){var ks=[panelKey(row.from)].concat(toList(row.to));A.labels.forEach(function(l){if(ks.indexOf(l.k)>=0)pts.push(l)})}zoomToPts(pts);renderAutoPanel();draw()})});
+    $('cAll').addEventListener('click',function(){A.sel=null;fitView();renderAutoPanel();draw()});
+  }
+}
+function copyText(txt){
+  function fb(){var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('복사했습니다. 엑셀에 붙여넣으세요.')}catch(e){toast('복사하지 못했습니다.')}document.body.removeChild(ta)}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){toast('복사했습니다. 엑셀에 붙여넣으세요.')},fb);else fb();
+}
+function copyAllPanels(){
+  var P=(S.an&&S.an.panels)||[],rows=[['분전반','도면','위치','구분','차단기','수량']],tot={};
+  P.forEach(function(p){
+    var all=(p.main?[p.main]:[]).concat(p.br),m={};
+    all.forEach(function(b){var k=(b.type||'?')+' '+(b.poles?b.poles+'P ':'')+b.af+'AF/'+b.at+'AT',isMain=b===p.main;var kk=(isMain?'인입':'분기')+'|'+k;m[kk]=(m[kk]||0)+1;tot[k]=(tot[k]||0)+1});
+    Object.keys(m).forEach(function(kk){var a=kk.split('|');rows.push([p.name,p.no?shNo(p.no):'',p.loc||'',a[0],a[1],m[kk]])});
+  });
+  rows.push([]);rows.push(['전체 합계','','','','차단기','수량']);
+  Object.keys(tot).sort().forEach(function(k){rows.push(['','','','',k,tot[k]])});
+  copyText(rows.map(function(r){return r.join('\t')}).join('\n'));
+}
+/* 쪽 선택 목록 */
+function fillPageSelect(){
+  var sel=$('pageSel');if(!sel||!S.idx)return;var h='';
+  CELLS.forEach(function(c){var rows=S.idx.filter(function(r){return cellKey(r.no,r.page)===c.k});if(!rows.length)return;
+    h+='<optgroup label="'+esc(c.name)+'">'+rows.map(function(r){return '<option value="'+r.page+'">'+(r.no?shNo(r.no)+' ':'')+esc(r.title||(r.page+'쪽'))+'</option>'}).join('')+'</optgroup>'});
+  if(S.pageNum&&!S.idx.some(function(r){return r.page===S.pageNum}))h+='<option value="'+S.pageNum+'">'+esc(S.pageName||'')+' '+S.pageNum+'쪽 (목록 읽는 중)</option>';
+  sel.innerHTML=h;if(S.pageNum)sel.value=S.pageNum;
+}
+
+setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage}},0);
+
+/* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
+var APP_VERSION='1.0.0';
+(function(){
+  var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
+  var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
+  var reg=null;
+  function showUpdate(w){var bar=$('updateBar');if(!bar)return;bar.hidden=false;$('updateBtn').onclick=function(){w.postMessage({type:'SKIP_WAITING'});$('updateBtn').textContent='업데이트 중…'}}
+  if(web){
+    navigator.serviceWorker.register('sw.js').then(function(r){
+      reg=r;
+      if(r.waiting&&navigator.serviceWorker.controller)showUpdate(r.waiting);
+      r.addEventListener('updatefound',function(){var w=r.installing;if(w)w.addEventListener('statechange',function(){if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdate(w)})});
+      setInterval(function(){r.update().catch(function(){})},30*60*1000);
+    }).catch(function(){});
+    var reloading=false;
+    navigator.serviceWorker.addEventListener('controllerchange',function(){if(reloading)return;reloading=true;location.reload()});
+  }
+  if(vb)vb.addEventListener('click',function(){
+    if(!web||!reg){toast('지금 버전은 v'+APP_VERSION+'입니다. 웹 주소로 설치한 앱에서 업데이트를 확인할 수 있어요.',4200);return}
+    vb.textContent='확인 중…';
+    reg.update().then(function(){
+      setTimeout(function(){vb.textContent='v'+APP_VERSION;
+        if(reg.waiting){showUpdate(reg.waiting);toast('새 버전이 있습니다. 위의 ‘업데이트’를 누르세요.')}
+        else if(reg.installing){toast('새 버전을 받는 중입니다. 잠시 뒤 업데이트 버튼이 나타납니다.')}
+        else toast('최신 버전입니다 (v'+APP_VERSION+').')},1200);
+    }).catch(function(){vb.textContent='v'+APP_VERSION;toast('업데이트를 확인하지 못했습니다. 인터넷 연결을 확인하세요.')});
+  });
+  var deferred=null,ib=$('installBtn');
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;if(ib)ib.hidden=false});
+  if(ib)ib.addEventListener('click',function(){if(!deferred)return;deferred.prompt();deferred.userChoice.finally(function(){deferred=null;ib.hidden=true})});
+  window.addEventListener('appinstalled',function(){if(ib)ib.hidden=true;toast('앱으로 설치했습니다. 홈 화면에서 여세요.')});
+})();
+
+loadSet();loadGroups();renderGroups();resize();draw();renderAll();
+function checkLib(n){
+  if(lib()){setStatus('준비됐습니다. ‘PDF 열기’를 눌러 도면 파일을 선택하세요.');return}
+  if(n>0){setTimeout(function(){checkLib(n-1)},800);return}
+  setStatus('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 페이지를 새로 열어 주세요.',true);
+}
+checkLib(10);
+window.__app={S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
+})();
+</script>
+</body>
+</html>
