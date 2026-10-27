@@ -169,6 +169,8 @@ section.view{display:flex;flex-direction:column;gap:12px}
 .ssite{margin-top:10px;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13.5px}.ssite ul{margin:4px 0 0;padding-left:18px}.sph{margin-top:8px}a.chip{display:inline-flex;align-items:center;text-decoration:none;border:1px solid var(--line,#d0d5dd);color:inherit}
 .procimgs{display:grid;gap:8px;margin-top:8px}.procimgs img{width:100%;height:auto;display:block;border:1px solid var(--line,#d0d5dd);border-radius:8px;background:#fff}
 html,body{overscroll-behavior-y:none}
+.amptbl summary{cursor:pointer;font-weight:600}.amptbl .tblwrap{overflow-x:auto;margin-top:8px}.amptbl table{border-collapse:collapse;font-size:13px;width:100%}.amptbl th,.amptbl td{border:1px solid var(--line,#d0d5dd);padding:3px 6px;text-align:right}.amptbl th{background:var(--bg)}
+.ab button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
@@ -1437,8 +1439,9 @@ function renderStudyPanel(){
   var box=$('studyPanel');if(!box)return;
   if(!S.segs.length){box.innerHTML='';box.hidden=true;return}
   var st=studyTopics();box.hidden=false;
-  if(!st.list.length){box.innerHTML='<h2>📚 이 도면 검토 노트</h2><div class="mini">도면 종류를 판단하지 못했습니다'+(st.title?' (“'+esc(st.title)+'”)':'')+'. ‘검토 가이드’ 탭에서 분야별 노트를 볼 수 있어요.</div>';return}
-  box.innerHTML='<h2>📚 이 도면 검토 노트</h2><div class="mini">'+(st.title?'“'+esc(st.title)+'” · ':'')+'근거 조항을 누르면 원문이 열립니다. 자동 = 앱이 계산, 직접 = 도면을 보고 확인.</div>'+st.list.map(function(s,i){return studyCard(s,i===0)}).join('');
+  var amp=(S.auto&&(S.auto.mode==='panel'||S.auto.mode==='cable'))||st.list.some(function(x){return x.id==='panel'||x.id==='feeder'})?ampTableHtml(true):'';
+  if(!st.list.length){box.innerHTML=amp+'<h2>📚 이 도면 검토 노트</h2><div class="mini">도면 종류를 판단하지 못했습니다'+(st.title?' (“'+esc(st.title)+'”)':'')+'. ‘검토 가이드’ 탭에서 분야별 노트를 볼 수 있어요.</div>';return}
+  box.innerHTML=amp+'<h2>📚 이 도면 검토 노트</h2><div class="mini">'+(st.title?'“'+esc(st.title)+'” · ':'')+'근거 조항을 누르면 원문이 열립니다. 자동 = 앱이 계산, 직접 = 도면을 보고 확인.</div>'+st.list.map(function(s,i){return studyCard(s,i===0)}).join('');
   bindStudy(box);
 }
 
@@ -1729,12 +1732,24 @@ function renderCab(){
   var box=$('v-cab');
   if(!S.rev){box.innerHTML='<div class="card empty2">'+(S.pdf?'도면을 읽는 중입니다…':'PDF를 열면 간선·분전반 검토 결과가 여기에 나옵니다.')+'</div>';return}
   var keep=$('setBox')&&$('setBox').open,h='';
+  h+=ampTableHtml(false);
   h+=settingsHtml(keep);
   h+='<div class="chips" id="chipbar"></div>';
   h+='<div id="cablist"></div>';
   box.innerHTML=h;
   bindSettings();
   renderChips();renderCabList();
+}
+/* 지금 검토에 쓰는 케이블 허용전류표(설정값) — 간선·분전반 검토할 때 같이 본다 */
+function ampTableHtml(open){
+  var s=S.set,E=s.amp.E||{},F=s.amp.F||{},tf=s.tempF||1,gf=s.groupF||1;
+  var ks=Object.keys(E).concat(Object.keys(F)).map(Number).filter(function(v,i,a){return a.indexOf(v)===i}).sort(function(a,b){return a-b});
+  var cf=(tf!==1||gf!==1);
+  var rows=ks.map(function(k){var e=E[k],f=F[k];
+    return '<tr><td>'+k+'</td><td>'+(e!=null?e:'-')+'</td><td>'+(f!=null?f:'-')+'</td>'+(cf?'<td>'+(e!=null?Math.round(e*tf*gf):'-')+'</td><td>'+(f!=null?Math.round(f*tf*gf):'-')+'</td>':'')+'</tr>'}).join('');
+  return '<details class="card amptbl"'+(open?' open':'')+'><summary>📏 케이블 허용전류표 <span class="mini">(지금 검토에 쓰는 값, A)</span></summary>'+
+    '<div class="tblwrap"><table><thead><tr><th>㎟</th><th>다심(E)</th><th>단심(F)</th>'+(cf?'<th>다심×보정</th><th>단심×보정</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="mini" style="margin-top:6px">구리·XLPE(90℃) 기본값 — '+lk('KEC 232.5')+'는 KS C IEC 60364-5-52 부속서 B 표를 따르게 하고 그 표는 KEC 본문에 없어서, 설계도서·시방서 값과 다르면 ‘⚙️ 검토 기준 설정’에서 고쳐 쓰세요. 보정계수: 온도 '+tf+' · 집합 '+gf+'. 판정: 허용전류(보정 후) ≥ 차단기 AT ('+lk('KEC 212.4.1')+')</div></details>';
 }
 function settingsHtml(open){
   var s=S.set,lm=s.limits;
@@ -2199,7 +2214,7 @@ var AUTO_COL=['#e8590c','#1c7ed6','#2f9e44','#c2255c','#7048e8','#0b7285','#e677
 var SIZE_COL=[[240,'#c92a2a'],[150,'#e8590c'],[120,'#f08c00'],[95,'#e67700'],[70,'#5c940d'],[50,'#2b8a3e'],[35,'#0b7285'],[25,'#1971c2'],[16,'#3b5bdb'],[10,'#7048e8'],[6,'#ae3ec9'],[4,'#c2255c'],[0,'#868e96']];
 function sizeColor(sz){for(var i=0;i<SIZE_COL.length;i++)if(sz>=SIZE_COL[i][0])return SIZE_COL[i][1];return '#868e96'}
 S.auto={mode:null};S.tplCache={};S.kCache={};
-function autoReset(){S.auto={mode:null};S.groups=S.groups.filter(function(g){return !g.auto});S.assign=null}
+function autoReset(){S.focusOnly=null;S.auto={mode:null};S.groups=S.groups.filter(function(g){return !g.auto});S.assign=null}
 function sleep0(){return new Promise(function(r){setTimeout(r,0)})}
 async function autoPage(){
   var pn=S.pageNum;autoReset();renderAutoPanel();
@@ -2264,7 +2279,7 @@ async function runLegend(L,pn){
       }
       var grp={id:Date.now()+Math.random(),auto:true,name:name,type:it.type,desc:it.desc,qty:it.qty,status:status,simple:simple,lfilter:lfilter,
         color:AUTO_COL[ci++%AUTO_COL.length],expected:it.qty==null?'':String(it.qty),
-        tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:status!=='guess'||true,key:key,legend:li};
+        tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:key,legend:li};
       S.groups.push(grp);S.auto.items.push(grp);
       if(t%2===1){setStatus('전등 자동 집계 중… '+it.type);renderAutoPanel();draw();await sleep0();if(S.pageNum!==pn)return}
     }
@@ -2377,14 +2392,16 @@ function renderAutoPanel(){
       var n=count(g),act=S.active===g.id;
       h+='<div class="arow'+(act?' act':'')+'" data-g="'+g.id+'"><span class="sw" style="background:'+g.color+'"></span><div class="an"><b>'+esc(g.type)+'형</b> <span class="mini">'+esc(g.desc||'')+'</span>'+(g.simple&&g.status!=='none'?'<div class="mini">'+(g.lfilter?'선 하나 모양 — 옆에 스위치 소문자가 있는 것만 셈':'선 하나 모양이라 다른 선이 섞일 수 있음')+'</div>':'')+'</div>'+
         '<div class="aq"><b>'+n+'</b><span class="mini">/ 표 '+(g.qty==null?'-':g.qty)+'</span></div>'+stLabel(g)+
-        '<div class="ab"><button type="button" data-go="'+g.id+'">보기</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
+        '<div class="ab"><button type="button" data-go="'+g.id+'"'+(S.focusOnly===g.id?' class="on"':'')+'>'+(S.focusOnly===g.id?'모두 보기':'보기')+'</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
     });
-    h+='</div><div class="mini" style="margin-top:8px">‘보기’를 누르면 그 타입만 강조됩니다. 틀린 동그라미는 ‘보정’ 모드에서 눌러 빼거나 더할 수 있어요. ‘지정’은 도면에서 그 심벌 하나를 네모로 감싸면 그 모양으로 다시 셉니다.</div>'+
+    h+='</div><div class="mini" style="margin-top:8px">‘보기’를 누르면 그 타입으로 인식한 것만 도면에 남습니다(다시 누르면 모두). 틀린 동그라미는 ‘보정’ 모드에서 눌러 빼거나 더할 수 있어요. ‘지정’은 도면에서 그 심벌 하나를 네모로 감싸면 그 모양으로 다시 셉니다.</div>'+
       '<div class="g3" style="margin-top:8px"><button type="button" id="aCopy">집계표 복사</button><button type="button" id="aAll">모두 보기</button></div>';
     box.innerHTML=h;
-    box.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var id=+b.dataset.go;S.active=id;S.groups.forEach(function(g){g.show=!g.auto||g.id===id});var g=S.groups.filter(function(x){return x.id===id})[0];zoomToPts(g.hits.filter(function(x){return !x.off}));renderAutoPanel();draw()})});
+    box.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var id=+b.dataset.go;
+      if(S.focusOnly===id){S.focusOnly=null;S.active=null;S.groups.forEach(function(g){g.show=true});fitView();renderAutoPanel();draw();return}
+      S.focusOnly=id;S.active=id;S.groups.forEach(function(g){g.show=g.id===id});var g=S.groups.filter(function(x){return x.id===id})[0];var pts=g.hits.filter(function(x){return !x.off});if(pts.length)zoomToPts(pts);else fitView();renderAutoPanel();draw();toast(g.type+'형으로 인식한 것만 표시합니다('+count(g)+'개). 다시 누르면 모두 보기.',3500)})});
     box.querySelectorAll('[data-as]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();S.assign=+b.dataset.as;var g=S.groups.filter(function(x){return x.id===S.assign})[0];setMode('sel');toast('도면을 확대한 뒤, '+g.type+'형 심벌 하나를 네모로 감싸 주세요.',5000)})});
-    $('aAll').addEventListener('click',function(){S.groups.forEach(function(g){g.show=true});S.active=null;fitView();renderAutoPanel();draw()});
+    $('aAll').addEventListener('click',function(){S.groups.forEach(function(g){g.show=true});S.active=null;S.focusOnly=null;fitView();renderAutoPanel();draw()});
     $('aCopy').addEventListener('click',function(){var rows=[['도면','타입','설명','찾은 수','표 수량','차이','상태']];A.items.forEach(function(g){var n=count(g);rows.push([S.pageName||S.pageNum,g.type,g.desc,n,g.qty==null?'':g.qty,g.qty==null?'':n-g.qty,{auto:'자동',manual:'지정',guess:'추정',none:'못 찾음'}[g.status]])});copyText(rows.map(function(r){return r.join('\t')}).join('\n'))});
     return;
   }
@@ -2458,7 +2475,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.5.5';
+var APP_VERSION='1.5.7';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
