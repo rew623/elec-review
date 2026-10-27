@@ -1381,7 +1381,7 @@ var STUDY=[
    {t:'세부내역으로 나눌 수 있는 공종을 1식단가로 계상하면 안 됨(예정가격작성기준)',r:['Q:1식단가']}],
   site:['기성 검측 때 실제 시공 방법(노출·매입·천장 속)이 내역 할증과 같은지','설계변경 시 수량 변동분 정산','완제품 분전반을 조립품으로 계상하지 않았는지'],
   ph:[]},
- {id:'fire',ic:'🚒',t:'비상콘센트·화재탐지·비상방송',why:'전기 도면에 소방 전원·배선이 함께 그려지는 경우가 많습니다.',
+ {id:'fire',pr:['5-52-라'],ic:'🚒',t:'비상콘센트·화재탐지·비상방송',why:'전기 도면에 소방 전원·배선이 함께 그려지는 경우가 많습니다.',
   chk:[
    {t:'비상콘센트 대상·전원: 7층 이상이면서 연면적 2,000 ㎡ 이상 등은 비상전원',r:['L:f504:2.1']},
    {t:'비상콘센트 전원회로: 단상 220 V·1.5 kVA 이상, 각 층 2회로 이상, 전용회로당 10개 이하',r:['L:f504:2.1']},
@@ -2409,7 +2409,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale;window.__app.renderAutoPanel=function(){renderAutoPanel()};window.__app.STUDY=STUDY;window.__app.loadKEC=loadKEC}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.5.0';
+var APP_VERSION='1.5.1';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
