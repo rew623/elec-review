@@ -492,7 +492,7 @@ function buildDark(){
   });
   var cell=0.5;
   D.forEach(function(s){var k=Math.floor(s.cx/cell)*8192+Math.floor(s.cy/cell);(g[k]||(g[k]=[])).push(s)});
-  S.D=D;S.grid=g;S.cell=cell;
+  S.D=D;S.grid=g;S.cell=cell;S.circles=findCircles(D);
 }
 function near(cx,cy,w,h,tol){
   var cell=S.cell,gx=Math.floor(cx/cell),gy=Math.floor(cy/cell),r=Math.ceil(tol/cell);
@@ -1764,6 +1764,62 @@ function bestScale(sel,name,excl){
   });
   return best;
 }
+
+/* ---------- 원형 심벌(B·F형): 곡선 조각을 끝점으로 이어 원을 찾고, 반지름 비율로 축척을 따로 구한다 ---------- */
+function findCircles(segs){
+  var cs=segs.filter(function(s){return s.p.length===8}),par=cs.map(function(_,i){return i});
+  function f(i){while(par[i]!==i){par[i]=par[par[i]];i=par[i]}return i}
+  var ep={},q=0.05;
+  function key(x,y){return Math.round(x/q)+','+Math.round(y/q)}
+  cs.forEach(function(s,i){[[s.p[0],s.p[1]],[s.p[6],s.p[7]]].forEach(function(e){
+    for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){var l=ep[(Math.round(e[0]/q)+a)+','+(Math.round(e[1]/q)+b)];if(l)l.forEach(function(j){if(Math.hypot(cs[j].ep[0]-e[0],cs[j].ep[1]-e[1])<q||Math.hypot(cs[j].ep[2]-e[0],cs[j].ep[3]-e[1])<q)par[f(i)]=f(j)})}
+  });
+    s.ep=[s.p[0],s.p[1],s.p[6],s.p[7]];
+    [[s.p[0],s.p[1]],[s.p[6],s.p[7]]].forEach(function(e){(ep[key(e[0],e[1])]||(ep[key(e[0],e[1])]=[])).push(i)});
+  });
+  var comp={};cs.forEach(function(s,i){(comp[f(i)]||(comp[f(i)]=[])).push(s)});
+  var out=[];
+  Object.keys(comp).forEach(function(k){
+    var c=comp[k];if(c.length<2)return;
+    var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    c.forEach(function(s){x0=Math.min(x0,s.bx0);y0=Math.min(y0,s.by0);x1=Math.max(x1,s.bx1);y1=Math.max(y1,s.by1)});
+    var w=x1-x0,h=y1-y0,r=(w+h)/4;
+    if(r<0.3||Math.abs(w-h)>0.06*(w+h)/2)return;
+    var cx=(x0+x1)/2,cy=(y0+y1)/2,ok=true;
+    c.forEach(function(s){for(var i=0;i<8;i+=6)if(Math.abs(Math.hypot(s.p[i]-cx,s.p[i+1]-cy)-r)>0.06*r)ok=false});
+    if(ok)out.push({cx:cx,cy:cy,r:r,segs:c});
+  });
+  return out;
+}
+/* 틀(sel) 안의 가장 큰 원을 기준으로, 도면의 원 반지름 분포에서 축척 후보를 만들어 센다 */
+function circleHits(sel,qty,excl){
+  var cl=findCircles(sel);if(!cl.length)return null;
+  var o=cl.reduce(function(a,b){return b.r>a.r?b:a});
+  var rest=sel.filter(function(s){return o.segs.indexOf(s)<0});
+  var plan=(S.circles||[]).filter(function(c){return !(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
+  var hist={};plan.forEach(function(c){var k=c.r/o.r;if(k<0.15||k>2.5)return;var kk=Math.round(k*100)/100;hist[kk]=(hist[kk]||0)+1});
+  var ks=Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).sort(function(a,b){return b.n-a.n}).slice(0,10);
+  var tol0=parseFloat($('tol').value)||0.15,all=$('rot').checked,best=null;
+  ks.forEach(function(kc){
+    var g={tmpl:rest.map(function(s){var r=[];for(var i=0;i<s.p.length;i+=2)r.push((s.p[i]-o.cx)*kc.k,(s.p[i+1]-o.cy)*kc.k);return r})};
+    var T=rest.length?variants(g,all):[[]],hits=[];
+    plan.forEach(function(c){
+      if(Math.abs(c.r/o.r-kc.k)>0.03*kc.k)return;
+      var tol=Math.max(tol0,0.04*c.r),found=false;
+      for(var v=0;v<T.length&&!found;v++){
+        var ok=0;T[v].forEach(function(t){if(near(t.cx+c.cx,t.cy+c.cy,t.w,t.h,tol))ok++});
+        if(!T[v].length||ok/T[v].length>=0.8)found=true;
+      }
+      if(found)hits.push({x:c.cx,y:c.cy});
+    });
+    /* 같은 중심(이중 원 등) 중복 제거 */
+    var kept=[];hits.forEach(function(h){if(!kept.some(function(m){return Math.hypot(m.x-h.x,m.y-h.y)<0.5*o.r*kc.k}))kept.push(h)});
+    var score=qty!=null?-Math.abs(kept.length-qty):kept.length;
+    if(kept.length&&(!best||score>best.score))best={k:kc.k,hits:kept,score:score,tmpl:sel.map(function(s){var r=[];for(var i=0;i<s.p.length;i+=2)r.push((s.p[i]-o.cx)*kc.k,(s.p[i+1]-o.cy)*kc.k);return r}),rest:rest.length};
+  });
+  if(best){var W=o.r*2*best.k;best.tw=W;best.th=W}
+  return best;
+}
 /*AL-END*/
 
 /* ===================== 도면 중심 자동 분석 ===================== */
@@ -1815,6 +1871,12 @@ async function runLegend(L,pn){
           var own=legendScale(sel,lg.bbox).slice(0,8),b2=null;
           own.forEach(function(kk){var gg=groupFromSegs(sel,name,kk),h=cntHits(gg,ex);if(h.length&&(!b2||Math.abs(h.length-(it.qty||0))<Math.abs(b2.h.length-(it.qty||0))))b2={g:gg,h:h}});
           if(b2){g=b2.g;hits=b2.h;status='guess'}
+        }
+      }
+      if(sel.length&&status!=='auto'&&status!=='manual'){
+        var cb=circleHits(sel,it.qty,ex);
+        if(cb&&(!hits.length||(it.qty!=null&&Math.abs(cb.hits.length-it.qty)<Math.abs(hits.length-it.qty)))){
+          g={tmpl:cb.tmpl,tw:cb.tw,th:cb.th};hits=cb.hits;status=cb.hits.length===it.qty?'auto':'guess';
         }
       }
       var simple=sel.length&&sel.length<=2&&sel.every(function(s){return s.p.length===4});
@@ -1996,10 +2058,10 @@ function fillPageSelect(){
   sel.innerHTML=h;if(S.pageNum)sel.value=S.pageNum;
 }
 
-setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage}},0);
+setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.1';
+var APP_VERSION='1.0.2';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
