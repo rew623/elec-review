@@ -1838,6 +1838,27 @@ function legendScale(sel,excl){
   });
   return Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).filter(function(o){return o.n>=2}).sort(function(x,y){return y.n-x.n}).slice(0,25).map(function(o){return o.k});
 }
+/* 범례의 원형 심벌들은 도면에서 모두 같은 비율(kc)로 줄어든다 → 반지름 비(예: D/B)가 맞는 비율을 한 번에 찾는다 */
+function circleScale(tm,excl,exboxes){
+  var items=[];
+  tm.forEach(function(x){var cl=findCircles(x.sel);if(!cl.length)return;var o=cl.reduce(function(a,b){return b.r>a.r?b:a});items.push({r:o.r,q:x.it.qty})});
+  if(items.length<1)return null;
+  var plan=(S.circles||[]).concat(S.fills||[]).filter(function(c){return !(exboxes&&exboxes.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
+  var rs=plan.map(function(c){return c.r}),cand={};
+  items.forEach(function(it){rs.forEach(function(r){var k=r/it.r;if(k>=0.1&&k<=1.2)cand[Math.round(k*200)/200]=1})});
+  var best=null;
+  Object.keys(cand).forEach(function(ks){
+    var k=parseFloat(ks),sc=0,kinds=0;
+    items.forEach(function(it){
+      var n=0,t=k*it.r;rs.forEach(function(r){if(Math.abs(r-t)<=0.04*t)n++});
+      if(n)kinds++;
+      sc+=it.q==null?Math.min(n,30):Math.min(n,it.q)-0.02*Math.max(0,n-it.q);
+    });
+    sc+=kinds*0.5;
+    if(!best||sc>best.sc)best={k:k,sc:sc};
+  });
+  return best&&best.sc>0?best.k:null;
+}
 function bestScale(sel,name,excl){
   var best={k:1,n:0,hits:[]};
   legendScale(sel,excl).forEach(function(k){
@@ -1872,7 +1893,7 @@ function findCircles(segs){
   return cl.filter(function(c){return c.ang>=5.4});
 }
 /* 틀(sel) 안의 가장 큰 원을 기준으로, 도면의 원 반지름 분포에서 축척 후보를 만들어 센다 */
-function circleHits(sel,qty,excl){
+function circleHits(sel,qty,excl,kFix){
   var cl=findCircles(sel);if(!cl.length)return null;
   var o=cl.reduce(function(a,b){return b.r>a.r?b:a});
   var twin=cl.filter(function(c){return Math.hypot(c.cx-o.cx,c.cy-o.cy)<0.1*o.r&&c.r>=0.8*o.r});
@@ -1890,13 +1911,13 @@ function circleHits(sel,qty,excl){
   var plan=(S.circles||[]).concat(S.fills||[]).filter(function(c){return !(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
   var hist={};plan.forEach(function(c){var k=c.r/o.r;if(k<0.15||k>2.5)return;var kk=Math.round(k*100)/100;hist[kk]=(hist[kk]||0)+1});
   var ks=Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).sort(function(a,b){return b.n-a.n}).slice(0,10);
+  if(kFix)ks=[{k:kFix,n:1}];
   var tol0=parseFloat($('tol').value)||0.15,all=$('rot').checked,best=null;
   ks.forEach(function(kc){
     var g={tmpl:rest.map(function(s){var r=[];for(var i=0;i<s.p.length;i+=2)r.push((s.p[i]-o.cx)*kc.k,(s.p[i+1]-o.cy)*kc.k);return r})};
     var T=rest.length?variants(g,all):[[]],hits=[];
     plan.forEach(function(c){
       if(Math.abs(c.r/o.r-kc.k)>0.03*kc.k)return;
-      if(planDot(c)!==hasDot)return;
       var tol=Math.max(tol0,0.04*c.r),found=false;
       for(var v=0;v<T.length&&!found;v++){
         var ok=0;T[v].forEach(function(t){if(near(t.cx+c.cx,t.cy+c.cy,t.w,t.h,tol))ok++});
@@ -1952,6 +1973,8 @@ async function runLegend(L,pn){
       var bs=0;for(var kk in score)if(score[kk]>bs){bs=score[kk];k=parseFloat(kk)}
       if(k)S.kCache[sig]=k;
     }
+    var kc=S.kCache[sig+'|c'];
+    if(kc===undefined){kc=circleScale(tm,lg.bbox,ex);S.kCache[sig+'|c']=kc||0}
     for(var t=0;t<tm.length;t++){
       var it=tm[t].it,sel=tm[t].sel,key=it.type+'|'+it.desc,g=null,status='none',hits=[];
       var name=it.type+(it.desc?' · '+it.desc:'');
@@ -1966,7 +1989,7 @@ async function runLegend(L,pn){
         }
       }
       if(sel.length&&status!=='auto'&&status!=='manual'){
-        var cb=circleHits(sel,it.qty,ex);
+        var cb=circleHits(sel,it.qty,ex,kc||null);
         if(cb&&(!hits.length||(it.qty!=null&&Math.abs(cb.hits.length-it.qty)<Math.abs(hits.length-it.qty)))){
           g={tmpl:cb.tmpl,tw:cb.tw,th:cb.th};hits=cb.hits;status=cb.hits.length===it.qty?'auto':'guess';
         }
@@ -2158,10 +2181,10 @@ function fillPageSelect(){
   sel.innerHTML=h;if(S.pageNum)sel.value=S.pageNum;
 }
 
-setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits}},0);
+setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.7';
+var APP_VERSION='1.0.8';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
