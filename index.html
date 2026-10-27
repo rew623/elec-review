@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="google" content="notranslate">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>전기설계 검토</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#3552d6">
@@ -168,6 +168,7 @@ section.view{display:flex;flex-direction:column;gap:12px}
 .sic{font-size:18px}.sw2{margin:4px 0 8px}.schk{margin:0;padding-left:0;list-style:none;display:grid;gap:8px}.schk li{display:flex;gap:8px;align-items:flex-start}.schk li>div{min-width:0;flex:1;overflow-wrap:anywhere}.schk .chips{margin-top:4px}
 .ssite{margin-top:10px;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13.5px}.ssite ul{margin:4px 0 0;padding-left:18px}.sph{margin-top:8px}a.chip{display:inline-flex;align-items:center;text-decoration:none;border:1px solid var(--line,#d0d5dd);color:inherit}
 .procimgs{display:grid;gap:8px;margin-top:8px}.procimgs img{width:100%;height:auto;display:block;border:1px solid var(--line,#d0d5dd);border-radius:8px;background:#fff}
+html,body{overscroll-behavior-y:none}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
@@ -1615,6 +1616,18 @@ function counts(){
   return c;
 }
 function renderAll(){renderTabs();renderSum();renderCls();renderCab();renderGuide()}
+/* ---------- 화면 이동 기록·안드로이드 뒤로가기 ----------
+   조항 원문을 열 때 그 전 화면(탭·열린 조항·스크롤)을 NAV에 쌓고, 뒤로가기·‘← 검색 결과’는 goBack()으로 되돌린다.
+   history에 ‘지킴이’ 칸을 하나 더 넣어 두어, 뒤로가기 한 번에 앱이 꺼지지 않게 한다. */
+var NAV=[];
+function navPush(){NAV.push({tab:S.tab,kSel:S.kSel||null,y:window.scrollY||0});if(NAV.length>30)NAV.shift()}
+function goBack(){
+  var e=NAV.pop();if(!e)return false;
+  S.tab=e.tab;S.kSel=e.kSel;renderTabs();
+  if(e.tab==='qty'){resize();draw()}
+  window.scrollTo(0,e.y);requestAnimationFrame(function(){window.scrollTo(0,e.y)});
+  return true;
+}
 function renderTabs(){
   var c=counts(),t=[['qty','📐 도면 보기'],['sum','📊 전체 검토'],['cab','🔌 간선·분전반 표'],['cls','🗂️ 도면 목록'],['kec','📖 법규 검색'],['gd','📋 검토 가이드']];
   var box=$('tabs2');box.innerHTML='';
@@ -1627,7 +1640,7 @@ function renderTabs(){
   if(S.tab==='kec')renderKEC();
 }
 function setTab(t){
-  S.tab=t;renderTabs();
+  NAV.length=0;S.tab=t;renderTabs();
   if(t==='qty'){resize();if(S.segs.length)fitView();draw()}
   window.scrollTo({top:0})
 }
@@ -1896,7 +1909,7 @@ function loadKEC(){
   KEC_LOADING.catch(function(){KEC_LOADING=null});
   return KEC_LOADING;
 }
-function openKEC(n){S.kSel=n;S.tab='kec';renderTabs();window.scrollTo({top:0})}
+function openKEC(n){navPush();S.kSel=n;S.tab='kec';renderTabs();window.scrollTo({top:0})}
 function hl(text,terms){
   var h=esc(text);
   terms.forEach(function(t){if(!t)return;var re=new RegExp(t.split('').map(function(ch){return ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}).join('\\s*'),'gi');h=h.replace(re,function(m){return '<mark>'+m+'</mark>'})});
@@ -1951,7 +1964,7 @@ function kecResults(){
   });
   h+='</div>';if(!res.length)h='<div class="card empty2">찾는 조항이 없습니다. 낱말을 줄이거나 다르게 써 보세요.</div>';
   out.innerHTML=h;
-  out.querySelectorAll('[data-k]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k;kecDetail(b.dataset.k)})});
+  out.querySelectorAll('[data-k]').forEach(function(b){b.addEventListener('click',function(){navPush();S.kSel=b.dataset.k;kecDetail(b.dataset.k)})});
 }
 function kecDetail(n){
   var out=$('kecOut'),i=KEC.idx[n];
@@ -1971,8 +1984,8 @@ function kecDetail(n){
   if(kids.length)h+='<div class="mini" style="margin-top:12px">세부 조항</div><div class="chips" style="margin-top:6px">'+kids.map(function(k){return '<button type="button" class="chip" data-k2="'+k.n+'">'+k.n+' '+esc(k.t)+'</button>'}).join('')+'</div>';
   h+='</div>';
   out.innerHTML=h;
-  out.querySelectorAll('[data-k2]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k2;kecDetail(b.dataset.k2)})});
-  var kb=$('kBack');if(kb)kb.addEventListener('click',function(){S.kSel=null;kecResults()});
+  out.querySelectorAll('[data-k2]').forEach(function(b){b.addEventListener('click',function(){navPush();S.kSel=b.dataset.k2;kecDetail(b.dataset.k2)})});
+  var kb=$('kBack');if(kb)kb.addEventListener('click',function(){if(NAV.length)goBack();else{S.kSel=null;kecResults()}});
   $('kCopy').addEventListener('click',function(){var t=kname(c)+' '+c.t+'\n'+c.b;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast('조항을 복사했습니다.')},function(){toast('복사하지 못했습니다.')});});
 }
 
@@ -2430,7 +2443,22 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale;window.__app.renderAutoPanel=function(){renderAutoPanel()};window.__app.STUDY=STUDY;window.__app.loadKEC=loadKEC}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.5.4';
+(function(){
+  var waitExit=false,exitT=null;
+  try{history.scrollRestoration='manual'}catch(e){}
+  function guard(){if(!(history.state&&history.state.erGuard))history.pushState({erGuard:1},'')}
+  try{history.replaceState({erRoot:1},'');guard()}catch(e){}
+  /* 크롬은 화면을 만지기 전에 넣은 칸을 건너뛸 수 있어 첫 터치 때 한 번 더 */
+  window.addEventListener('pointerdown',function(){if(!waitExit)guard()},true);
+  window.addEventListener('popstate',function(){
+    if(history.state&&history.state.erGuard)return;
+    if(goBack()){guard();return}
+    if(S.tab!=='qty'){setTab('qty');window.scrollTo(0,0);guard();return}
+    waitExit=true;toast('한 번 더 누르면 종료돼요',2000);
+    clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
+  });
+})();
+var APP_VERSION='1.5.5';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
