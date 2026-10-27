@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" translate="no" class="notranslate">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>전기설계 검토</title>
 <link rel="manifest" href="manifest.json">
@@ -242,6 +243,9 @@ tr.pk{cursor:pointer}tr.pk.act td{background:var(--accent-soft)}
 .ver{font-family:var(--mono);font-size:12.5px;min-height:40px;color:var(--muted)}
 .updbar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#fff3bf;color:#5c3c00;border:1px solid #ffd43b;border-radius:12px;padding:8px 12px;font-weight:600}
 .updbar[hidden]{display:none!important}
+.ihelp{position:fixed;inset:0;background:rgba(10,15,30,.45);display:grid;place-items:center;z-index:50;padding:16px}
+.ibox{background:var(--panel);color:var(--ink);border-radius:16px;padding:18px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.ibox h2{margin:0 0 8px;font-size:17px}.ibox ol{padding-left:20px;line-height:1.8}.ibox button{margin-top:10px;width:100%}
 </style>
 <script>
 (function(){
@@ -1995,7 +1999,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.0';
+var APP_VERSION='1.0.1';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
@@ -2023,8 +2027,22 @@ var APP_VERSION='1.0.0';
   });
   var deferred=null,ib=$('installBtn');
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;if(ib)ib.hidden=false});
-  if(ib)ib.addEventListener('click',function(){if(!deferred)return;deferred.prompt();deferred.userChoice.finally(function(){deferred=null;ib.hidden=true})});
-  window.addEventListener('appinstalled',function(){if(ib)ib.hidden=true;toast('앱으로 설치했습니다. 홈 화면에서 여세요.')});
+  var standalone=window.matchMedia&&matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(ib&&web&&!standalone)ib.hidden=false;
+  if(ib)ib.addEventListener('click',function(){
+    if(deferred){deferred.prompt();deferred.userChoice.finally(function(){deferred=null});return}
+    var sam=/SamsungBrowser/i.test(navigator.userAgent);
+    showInstallHelp(sam);
+  });
+  function showInstallHelp(sam){
+    var d=document.createElement('div');d.className='ihelp';
+    d.innerHTML='<div class="ibox"><h2>📲 앱으로 설치하기</h2>'+(sam?
+      '<p><b>삼성 인터넷</b>에서는 아래 순서로 설치하세요.</p><ol><li>아래쪽 메뉴(≡) 누르기</li><li><b>현재 페이지 추가</b> → <b>홈 화면</b></li><li>홈 화면의 ⚡ 전기검토 아이콘으로 열기</li></ol><p class="mini">“앱을 열 수 없음”이 뜨면 <b>크롬</b>으로 이 주소를 열어 설치하는 게 가장 확실합니다.</p>':
+      '<p><b>크롬</b>에서는 아래 순서로 설치하세요.</p><ol><li>오른쪽 위 메뉴(⋮) 누르기</li><li><b>앱 설치</b>(또는 홈 화면에 추가 → 설치)</li><li>홈 화면의 ⚡ 전기검토 아이콘으로 열기</li></ol><p class="mini">PC 크롬은 주소창 오른쪽의 설치 아이콘(⊕)을 눌러도 됩니다.</p>')+
+      '<p class="mini">주소: '+location.href.split('#')[0]+'</p><button type="button" class="primary" id="ihClose">확인</button></div>';
+    document.body.appendChild(d);d.querySelector('#ihClose').onclick=function(){d.remove()};d.onclick=function(e){if(e.target===d)d.remove()};
+  }
+  window.addEventListener('appinstalled',function(){if(ib)ib.hidden=true;deferred=null;toast('앱으로 설치했습니다. 홈 화면에서 여세요.')});
 })();
 
 loadSet();loadGroups();renderGroups();resize();draw();renderAll();
