@@ -164,6 +164,9 @@ section.view{display:flex;flex-direction:column;gap:12px}
 .banner.info{background:var(--infobg);color:var(--info)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .chip{border-radius:99px;min-height:34px;padding:4px 12px;font-size:13px}
+.study{border-top:1px solid var(--line,#e3e7ef);padding:8px 0}.study summary{cursor:pointer;display:flex;align-items:center;gap:6px;min-height:36px;list-style:none}.study summary::-webkit-details-marker{display:none}.study summary::after{content:'▾';margin-left:auto;color:var(--muted)}.study[open] summary::after{content:'▴'}
+.sic{font-size:18px}.sw2{margin:4px 0 8px}.schk{margin:0;padding-left:0;list-style:none;display:grid;gap:8px}.schk li{display:flex;gap:8px;align-items:flex-start}.schk li>div{min-width:0;flex:1;overflow-wrap:anywhere}.schk .chips{margin-top:4px}
+.ssite{margin-top:10px;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13.5px}.ssite ul{margin:4px 0 0;padding-left:18px}.sph{margin-top:8px}a.chip{display:inline-flex;align-items:center;text-decoration:none;border:1px solid var(--line,#d0d5dd);color:inherit}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
@@ -299,6 +302,7 @@ tr.pk{cursor:pointer}tr.pk.act td{background:var(--accent-soft)}
     </div>
     <div class="side">
       <div class="panel autop" id="autoPanel"></div>
+      <div class="panel autop" id="studyPanel" hidden></div>
       <div id="manualPanels" class="manp">
       <div class="panel">
         <h2>직접 지정한 심벌</h2>
@@ -1243,6 +1247,143 @@ function parseListPos(items,w,h){
 }
 function normTitle(t){return String(t||'').replace(/[\s"“”'`]/g,'').replace(/[()（）\[\]]/g,'')}
 /*PURE-END*/
+/* ---------- 검토 노트: 도면 종류별로 법규를 가공한 공부·검토·감독 자료 ----------
+   ref: 'K:232.41'(KEC) · 'L:pv:제20조'(law-data.js 조문) · 'Q:낱말'(법규 검색)  /  a:1 = 앱이 자동 검토 */
+var STUDY=[
+ {id:'light',ic:'💡',t:'조명(전등) 설계',why:'학교는 교실 조도가 법으로 정해져 있고, 공공건축물은 에너지절약설계기준의 조명 의무사항을 지켜야 합니다.',
+  chk:[
+   {t:'전등표 타입별 수량 = 도면 심벌 수',a:1,d:'앱이 전등표를 읽어 타입별로 셉니다. 차이가 나면 내역서 수량과 대조하세요.'},
+   {t:'교실 조도: 책상면 300 lx 이상, 최대·최소 조도 비 3:1 이하, 눈부심 없게',d:'조도계산서(또는 설계설명서)에서 교실 평균조도·균제도를 확인합니다. 300 lx는 "이상"이므로 등기구 광속·개수·보수율로 계산된 값이 이를 넘는지 봅니다.',r:['L:sch:별표 2']},
+   {t:'창측 전등군은 부분점멸, 점멸회로 구분',d:'일사광이 들어오는 창쪽 전등이 별도 스위치(회로)로 나뉘었는지 평면도의 스위치 기호(a·b·c)와 배선으로 확인합니다.',r:['L:en:제10조']},
+   {t:'유도등·주차장 조명은 고효율 LED, 램프는 최저소비효율기준 만족',d:'전등표 LAMP 칸과 시방서에서 확인합니다.',r:['L:en:제10조']},
+   {t:'공공건축물: 에너지성능지표 전기설비부문 8번 0.6점 이상(공공기관 에너지합리화 규정 대상은 1점)',d:'에너지절약계획서의 EPI 표에서 확인합니다.',r:['L:en:제10조']},
+   {t:'등기구 시설(시동전류·고조파·누설전류 고려)',d:'KEC 234.1은 등기구 선정 시 고려사항을 정합니다. 분기회로 차단기 용량과 함께 봅니다.',r:['K:234.1']}],
+  site:['납품 등기구가 전등표 사양(W·광속·효율등급)과 같은지 승인서·KS/고효율 인증서 확인','천장 매입 등기구 지지(천장재에만 얹지 않았는지)','스위치 회로가 도면의 a·b·c 구분대로 결선됐는지 점등 시험'],
+  ph:['LED 교실 조명 시공','천장 매입 등기구 지지 시공']},
+ {id:'exit',ic:'🚪',t:'유도등·비상조명등',why:'소방 화재안전기술기준(NFTC)으로 위치·높이·간격이 정해져 있어 도면에서 바로 확인할 수 있습니다.',
+  chk:[
+   {t:'피난구유도등: 바닥에서 1.5 m 이상, 출입구에 인접',d:'옥외로 통하는 출입구, 직통계단(계단실) 출입구, 거기로 통하는 복도 출입구 등에 있는지 봅니다.',r:['L:f303:2.2']},
+   {t:'출입구 인근 천장에 피난구유도등을 면과 수직으로 추가 설치 + 화살표 표시(2024.7.1 신설)',d:'입체형이면 제외. 최근 개정 사항이라 설계 누락이 잦습니다.',r:['L:f303:2.2']},
+   {t:'복도통로유도등: 모퉁이와 보행거리 20 m마다, 바닥에서 1 m 이하',d:'복도 길이를 축척으로 재어 20 m 간격인지 봅니다. 피난구유도등 맞은편 복도에는 입체형 또는 바닥형.',r:['L:f303:2.3']},
+   {t:'거실통로유도등 1.5 m 이상, 계단통로유도등은 계단참마다 1 m 이하',r:['L:f303:2.3']},
+   {t:'비상조명등: 각 거실과 지상까지의 복도·계단·통로, 바닥 1 lx 이상',r:['L:f304:2.1']},
+   {t:'비상조명등 예비전원 20분 이상(11층 이상 등은 60분), 점검스위치',d:'학교(11층 미만)는 보통 20분. 내장형이면 점검스위치·축전지 내장.',r:['L:f304:2.1']}],
+  site:['유도등 설치 높이 실측(피난구 1.5 m 이상, 복도통로 1 m 이하)','예비전원 점등 시험(전원 차단 후 20분 유지)','천장 추가 피난구유도등의 화살표 방향이 실제 피난 방향과 맞는지'],
+  ph:['피난구유도등 설치 높이','복도통로유도등 시공']},
+ {id:'outlet',ic:'🔌',t:'전열(콘센트)',why:'누전차단기 시설과 콘센트 시설 기준이 KEC에 있습니다.',
+  chk:[
+   {t:'콘센트 회로 누전차단기',a:1,d:'분전반 결선도에서 전열 회로가 누전차단기(ELB·CBR·RCBO)인지 앱이 표시합니다.',r:['K:211.2.4']},
+   {t:'콘센트의 시설(접지극 있는 것, 물기 있는 곳은 방적형 등)',r:['K:234.5']},
+   {t:'회로당 콘센트 수·회로명이 분전반과 일치',d:'평면도 회로번호와 분전반 결선도 회로명을 대조합니다.'}],
+  site:['콘센트 접지극 결선, 극성 확인','화장실·급식실 등 물기 있는 곳 방적형·누전차단기'],
+  ph:['방적형 콘센트 설치']},
+ {id:'panel',ic:'🗄️',t:'분전반·차단기',why:'차단기 정격과 전선 허용전류의 협조는 화재 예방의 핵심입니다.',
+  chk:[
+   {t:'설계전류 ≤ 차단기 정격 ≤ 전선 허용전류 (IB ≤ In ≤ Iz)',a:1,d:'앱이 간선 목록·결선도에서 AT와 케이블 허용전류를 비교합니다. 산업용 MCCB는 이 식을 만족하면 I2 ≤ 1.45·Iz도 자동 충족.',r:['K:212.4.1']},
+   {t:'인입 차단기 AF ≥ AT, 표준 정격, 누전차단기 회로',a:1,r:['K:211.2.4']},
+   {t:'전동기 분기: 기동전류 고려(In ≥ Im·β/δ)',d:'기동시간이 긴 전동기는 차단기가 커지고 그에 맞춰 전선도 굵어져야 합니다(가이드북 예: 22 kW → MCCB 63 A, HFIX 16㎟).',r:['K:212.4.1']},
+   {t:'전동기별 역률개선용 콘덴서(소방·인버터 전동기 제외)',d:'에너지절약계획서 대상이면 의무입니다.',r:['L:en:제10조']},
+   {t:'노출 충전부 있는 반은 취급자만 출입, 분전반 1개에 간선 1회선, 캐비닛 난연성',r:['K:232.84']}],
+  site:['차단기 명판(AF/AT, 정격차단용량 kA)이 결선도와 같은지','캐비닛 KS C 8326 난연 성적서','결선 토크·상 배열(L1·L2·L3 색), 회로명 표시'],
+  ph:['분전반 내부 결선 정리','배선용차단기 명판']},
+ {id:'feeder',ic:'⚡',t:'간선(케이블)',why:'허용전류·보호도체·전압강하가 간선 검토의 3요소입니다.',
+  chk:[
+   {t:'허용전류 ≥ 차단기 AT',a:1,r:['K:212.4.1','K:232.5']},
+   {t:'보호도체(PE) 굵기',a:1,r:['K:142.3.2']},
+   {t:'전압강하: 저압수전 조명 3%·기타 5%, 고압수전 조명 6%·기타 8%, 100 m 초과분 0.005%/m(한도 0.5%) 가산',a:1,d:'간선 카드에 거리·전류를 넣으면 누적 전압강하를 계산합니다. 계산은 저압 차단기 2차측부터.',r:['K:232.3.9','L:en:제10조']},
+   {t:'간략식(300 A·300 m 이하): 3상3선 e=30.8·L·I/(1000·A), 단상2선 35.6, 3상4선 17.8',d:'L 길이(m), I 전류(A), A 단면적(㎟). 역률 1·리액턴스 무시, 구리 저항에 약 3% 여유.'}],
+  site:['포설 케이블 규격·심수 표기(시스 인쇄)가 간선 목록과 같은지','단말 처리·압착, 상 식별 색','수직 샤프트 케이블 지지(안전율 4 이상)'],
+  ph:['간선 케이블 단말처리','수직 케이블 지지 시공']},
+ {id:'tray',ic:'🪜',t:'케이블트레이',why:'트레이 폭·이격은 허용전류 저감과 화재 확산에 직결됩니다.',
+  chk:[
+   {t:'케이블 바깥지름 합계 ≤ 트레이 내측폭, 단층 포설',a:1,r:['K:232.41.1']},
+   {t:'저압·고압 케이블 같은 트레이 금지(불연 격벽·금속외장이면 가능)',a:1,r:['K:232.41.1']},
+   {t:'난연 케이블(F-CV·FR-CV 등), 벽면 20 mm·트레이 단 간 300 mm 이상(좁으면 저감계수)',d:'KEC 시공 가이드북 p.195~196.',r:['K:232.41']},
+   {t:'방화구획 관통부 처리',r:['Q:화재 확산']}],
+  site:['트레이 접지·본딩 연속성','수직 트레이 케이블 타이 고정','관통부 내화충전재','트레이 위 기계배관 간섭(300 mm 확보)'],
+  ph:['케이블트레이 포설 시공','케이블트레이 방화구획 관통부 처리']},
+ {id:'sub',ic:'🏭',t:'수변전설비',why:'변압기 효율, 배전반 유지보수 공간, 사용전검사 대상 여부를 확인합니다.',
+  chk:[
+   {t:'변압기 신설·교체 시 고효율 제품',r:['L:en:제10조']},
+   {t:'배전반 이격: 고·저압 앞 1.5 m·뒤 0.6 m·열 간 1.2 m, 특고압 1.7·0.8·1.4 m',d:'KEC 핸드북 부록 350(권장 기준, 협회 답변: 가급적 준수). 전기실 평면도에 치수로 확인. 의견서에는 "핸드북 권장 기준"으로 표현.'},
+   {t:'비상콘센트 상용전원 분기 위치(고압수전: 변압기 2차측 주차단기 1차 또는 2차측에서 전용 분기)',r:['L:f504:2.1']},
+   {t:'자가용 전기설비 공사계획 인가·신고 대상, 사용전검사',r:['L:es:별표 1','Q:사용전검사']}],
+  site:['전기실 실측(배전반 앞·뒤 공간, 문 열림)','변압기 효율 인증','접지저항·절연저항 측정 성적'],
+  ph:['수배전반 전면 유지보수 공간','큐비클 설치']},
+ {id:'ltn',ic:'🌩️',t:'피뢰·접지',why:'높이 20 m 이상 건축물은 건축법령에 따라 피뢰설비가 의무이고, KEC 150·140이 시설 방법을 정합니다.',
+  chk:[
+   {t:'대상: 높이 20 m 이상(또는 낙뢰 우려) 건축물·공작물',r:['L:pv:제20조']},
+   {t:'돌침은 건축물 맨 윗부분에서 25 cm 이상 돌출',r:['L:pv:제20조']},
+   {t:'수뢰부·인하도선·접지극 단면적 동선 기준 50㎟ 이상',r:['L:pv:제20조']},
+   {t:'철골·철근을 인하도선 대신 쓰면 최상단~지표 전기저항 0.2 Ω 이하',r:['L:pv:제20조']},
+   {t:'높이 60 m 초과 시 측면 수뢰부',r:['L:pv:제20조']},
+   {t:'금속배관 등전위 접속, 통합접지 시 서지보호장치(SPD)',d:'분전반 결선도에 SPD가 있는지 확인합니다.',r:['L:pv:제20조','K:153']},
+   {t:'외부·내부 피뢰시스템, 접지시스템 구분과 보호도체',r:['K:151','K:152','K:141','K:142.3.2']}],
+  site:['인하도선 접속부(용접·압착) 상태','접지저항·연속성(0.2 Ω) 측정','SPD 설치 위치·접지선 길이'],
+  ph:['피뢰침 돌침 설치','인하도선 시공','서지보호장치 SPD 분전반']},
+ {id:'pv',ic:'☀️',t:'태양광',why:'공공기관 신축은 재생에너지 설치 의무가 있고, KEC 520이 시설 방법을 정합니다.',
+  chk:[
+   {t:'태양광설비의 시설(모듈·인버터·접속함·배선)',r:['K:521','K:522']},
+   {t:'재생에너지 설비 지원·시공 기준',r:['Q:태양광']},
+   {t:'공공기관 재생에너지 공급의무 비율',r:['Q:공급의무']}],
+  site:['모듈 구조물 고정·접지','인버터 효율·인증','직류 배선 극성·차단장치'],
+  ph:['학교 옥상 태양광 시공']},
+ {id:'fire',ic:'🚒',t:'비상콘센트·화재탐지·비상방송',why:'전기 도면에 소방 전원·배선이 함께 그려지는 경우가 많습니다.',
+  chk:[
+   {t:'비상콘센트 대상·전원: 7층 이상이면서 연면적 2,000 ㎡ 이상 등은 비상전원',r:['L:f504:2.1']},
+   {t:'비상콘센트 전원회로: 단상 220 V·1.5 kVA 이상, 각 층 2회로 이상, 전용회로당 10개 이하',r:['L:f504:2.1']},
+   {t:'비상콘센트 높이 0.8~1.5 m, 계단 출입구 5 m 이내, 수평거리 50 m 이하',r:['L:f504:2.1']},
+   {t:'자동화재탐지설비·비상방송 전원·배선',r:['Q:자동화재탐지설비','Q:비상방송']}],
+  site:['비상콘센트 보호함 표지·높이','풀박스 1.6 mm 철판 방청'],
+  ph:['비상콘센트 보호함 설치']}
+];
+/* 이 쪽에 해당하는 검토 노트 고르기: 도면명 + 쪽 글자 + 자동 분석 종류 */
+function studyTopics(){
+  var row=S.idx&&S.idx.filter(function(r){return r.page===S.pageNum})[0],title=(row&&row.title)||'';
+  var txt=S.texts.slice(0,3000).map(function(t){return t.s}).join(' '),A=S.auto||{},on={};
+  function has(re){return re.test(title)||re.test(txt)}
+  if(A.mode==='legend'||/전등|조명/.test(title)){on.light=1;on.exit=1}
+  if(/유도등|비상조명/.test(title+' '+txt))on.exit=1;
+  if(/전열|콘센트/.test(title))on.outlet=1;
+  if(A.mode==='panel'||/분전반|결선도|동력반/.test(title)){on.panel=1;on.outlet=1}
+  if(A.mode==='cable'||/간선|계통도|CABLE\s*SCHEDULE/i.test(title+' '+txt))on.feeder=1;
+  if(has(/TRAY|트레이/i))on.tray=1;
+  if(/수변전|수전|변전|단선결선|큐비클|배전반|발전기/.test(title))on.sub=1;
+  if(/피뢰|접지|돌침|인하도선/.test(title))on.ltn=1;
+  if(has(/태양광|태양전지|인버터|PV\b/))on.pv=1;
+  if(/비상콘센트|자동화재|감지기|비상방송|소방/.test(title))on.fire=1;
+  return {title:title,list:STUDY.filter(function(s){return on[s.id]})};
+}
+function refChip(r){
+  if(r.indexOf('Q:')===0)return '<button type="button" class="chip" data-kq="'+esc(r.slice(2))+'">🔎 '+esc(r.slice(2))+'</button>';
+  var id=r.indexOf('K:')===0?r.slice(2):r,lab;
+  if(id.indexOf('L:')===0){var p=id.split(':'),nm={pv:'건축물 설비기준 규칙',sch:'학교보건법 시행규칙',en:'에너지절약설계기준',es:'전기안전관리법 시행규칙',f303:'NFTC 303',f304:'NFTC 304',f504:'NFTC 504',f203:'NFTC 203',f202:'NFTC 202',re:'재생에너지법 시행령',re2:'재생에너지 설비 규정',chk:'검사·점검 고시'}[p[1]]||p[1];lab=nm+' '+p.slice(2).join(':')}
+  else lab='KEC '+id;
+  return '<button type="button" class="chip" data-kec="'+esc(id)+'">📖 '+esc(lab)+'</button>';
+}
+function studyCard(s,open){
+  var q=function(x){return encodeURIComponent(x)};
+  return '<details class="study"'+(open?' open':'')+'><summary><span class="sic">'+s.ic+'</span><b>'+esc(s.t)+'</b><span class="mini"> · '+s.chk.length+'개 항목</span></summary>'+
+   '<div class="mini sw2">'+esc(s.why)+'</div>'+
+   '<ol class="schk">'+s.chk.map(function(c){return '<li><span class="tag '+(c.a?'auto':'man')+'">'+(c.a?'자동':'직접')+'</span><div><div>'+esc(c.t)+'</div>'+(c.d?'<div class="mini">'+esc(c.d)+'</div>':'')+(c.r?'<div class="chips">'+c.r.map(refChip).join('')+'</div>':'')+'</div></li>'}).join('')+'</ol>'+
+   '<div class="ssite"><b>🏗️ 공사감독 때 볼 것</b><ul>'+s.site.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>'+
+   '<div class="chips sph"><span class="mini">📷 시공 사진 찾아보기:</span>'+s.ph.map(function(x){return '<a class="chip" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q='+q(x)+'">'+esc(x)+'</a>'}).join('')+'</div></details>';
+}
+function bindStudy(root){
+  bindJumps(root);
+  root.querySelectorAll('[data-kq]').forEach(function(b){b.addEventListener('click',function(){S.kSel=null;S.kSrc='all';setTab('kec');var go=function(){if($('kecQ')){$('kecQ').value=b.dataset.kq;kecResults()}};loadKEC().then(function(){setTimeout(go,0)})})});
+}
+var _renderAutoPanel0=null;
+function renderStudyPanel(){
+  var box=$('studyPanel');if(!box)return;
+  if(!S.segs.length){box.innerHTML='';box.hidden=true;return}
+  var st=studyTopics();box.hidden=false;
+  if(!st.list.length){box.innerHTML='<h2>📚 이 도면 검토 노트</h2><div class="mini">도면 종류를 판단하지 못했습니다'+(st.title?' (“'+esc(st.title)+'”)':'')+'. ‘검토 가이드’ 탭에서 분야별 노트를 볼 수 있어요.</div>';return}
+  box.innerHTML='<h2>📚 이 도면 검토 노트</h2><div class="mini">'+(st.title?'“'+esc(st.title)+'” · ':'')+'근거 조항을 누르면 원문이 열립니다. 자동 = 앱이 계산, 직접 = 도면을 보고 확인.</div>'+st.list.map(function(s,i){return studyCard(s,i===0)}).join('');
+  bindStudy(box);
+}
+
+setTimeout(function(){_renderAutoPanel0=renderAutoPanel;renderAutoPanel=function(){_renderAutoPanel0.apply(this,arguments);try{renderStudyPanel()}catch(e){}}},0);
 /* ---------- 검토 가이드 (도면 종류별: 무엇을 봐야 하나) ---------- */
 var GUIDE=[
  {t:'도면 일반 (0xx)',i:[['도면목록표와 실제 쪽의 번호·도면명 일치','auto'],['시방서·주기사항의 적용 기준(KEC·내선규정·KS) 확인','man'],['범례 심벌과 평면도 심벌 일치','man'],['설계개요(면적·층수)와 도면 일치','man']]},
@@ -1633,18 +1774,18 @@ function copyCab(){
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){m.textContent='복사했습니다. 엑셀에 붙여넣으세요.'},fb);else fb();
 }
 function renderGuide(){
-  var box=$('v-gd'),h='<div class="card"><h2>📋 도면 종류별 검토 가이드</h2><div class="mini">무엇을 봐야 하는지, 그중 앱이 대신 해 주는 것과 직접 확인할 것을 나눴어요. <span class="tag auto">자동</span> <span class="tag qty">수량 탭</span> <span class="tag man">직접 확인</span> <span class="tag soon">준비 중</span></div></div><div class="gd">';
+  var box=$('v-gd'),h='<div class="card"><h2>📚 분야별 검토 노트</h2><div class="mini">도면 쪽을 열면 그 도면에 맞는 노트가 도면 옆에 자동으로 뜹니다. 여기서는 전체를 볼 수 있어요.</div>'+STUDY.map(function(s){return studyCard(s,false)}).join('')+'</div><div class="card"><h2>📋 도면 종류별 검토 가이드</h2><div class="mini">무엇을 봐야 하는지, 그중 앱이 대신 해 주는 것과 직접 확인할 것을 나눴어요. <span class="tag auto">자동</span> <span class="tag qty">수량 탭</span> <span class="tag man">직접 확인</span> <span class="tag soon">준비 중</span></div></div><div class="gd">';
   GUIDE.forEach(function(g){h+='<div class="card"><h2>'+esc(g.t)+'</h2><ul>'+g.i.map(function(i){var t=TAGS[i[1]];return '<li><span class="tag '+t[1]+'">'+t[0]+'</span><span>'+lk(i[0])+'</span></li>'}).join('')+'</ul></div>'});
   h+='</div><div class="card"><h2>🏗️ 공사감독 현장 체크</h2><div class="mini">『KEC 시공 가이드북 2025』(한국전기공사협회)에서 해당 쪽을 읽고 정리했습니다. 가이드북은 해설서이고 KEC 고시 본문이 아닙니다. 아직 반영하지 않은 장: 전선 종류·접속, 접지시스템, 피뢰, 배관·덕트·애자·버스덕트·조명 시공, 허용전류 표, 고압·특고압.</div></div><div class="gd">';
   GUIDE_SITE.forEach(function(g){h+='<div class="card"><h2>'+esc(g.t)+'</h2><div class="mini">출처: '+esc(g.src)+'</div><ul>'+g.i.map(function(x){return '<li><span class="tag man">현장 확인</span><span>'+lk(x)+'</span></li>'}).join('')+'</ul></div>'});
   h+='</div><div class="card"><h2>알아 두세요</h2><div class="mini">· 전압강하 한계(KEC 232.3.9)와 보호도체 기준(KEC 142.3.2)은 KEC 원문(2026.1.5 시행)과 대조해 넣었습니다. 허용전류 표는 KEC가 KS C IEC 60364-5-52 부속서 B를 따르도록 해서 기본값으로 넣었으니 KS 표로 확인하세요.<br>· 전압강하는 간이식(리액턴스 무시) <b>e = K·L·I / (1000·A)</b>, 3상4선 K=17.8, 단상2선 K=35.6, 기준전압 220V로 계산합니다.<br>· 거리는 도면에서 직접 재어 넣으세요(트레이 길이는 평면도 스케일로 측정).<br>· 인터넷이 없는 PC에서는 pdf.min.js와 pdf.worker.min.js를 이 파일과 같은 폴더에 두면 그 파일을 먼저 씁니다.</div></div>';
-  box.innerHTML=h;bindJumps(box);
+  box.innerHTML=h;bindStudy(box);
 }
 $('clsFind').addEventListener('input',renderCls);
 
 /* ---------- KEC 검색 (원문 내장, 인터넷 불필요) ---------- */
 var KEC=null,KEC_LOADING=null;
-var KEC_QUICK=[['L:pv:제20조','피뢰설비'],['L:sch:별표 2','교실 조도'],['L:en:제10조','에너지 전기부문'],['L:f303:2.1','유도등'],['L:f304:2.1','비상조명등'],['L:f504:2.1','비상콘센트'],['232.3.9','전압강하'],['142.3.2','보호도체'],['212.4.1','과부하 보호 협조'],['232.5','허용전류'],['232.41','케이블트레이공사'],['211.2.4','누전차단기'],['234.5','콘센트'],['142','접지시스템'],['151','피뢰시스템'],['522','태양광설비']];
+var KEC_QUICK=[['L:pv:제20조','피뢰설비'],['L:sch:별표 2','교실 조도'],['L:en:제10조','에너지 전기부문'],['L:f303:2.2','유도등'],['L:f304:2.1','비상조명등'],['L:f504:2.1','비상콘센트'],['232.3.9','전압강하'],['142.3.2','보호도체'],['212.4.1','과부하 보호 협조'],['232.5','허용전류'],['232.41','케이블트레이공사'],['211.2.4','누전차단기'],['234.5','콘센트'],['142','접지시스템'],['151','피뢰시스템'],['522','태양광설비']];
 function loadKEC(){
   if(KEC)return Promise.resolve(KEC);
   if(KEC_LOADING)return KEC_LOADING;
@@ -2206,10 +2347,10 @@ function fillPageSelect(){
   sel.innerHTML=h;if(S.pageNum)sel.value=S.pageNum;
 }
 
-setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale}},0);
+setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale;window.__app.renderAutoPanel=function(){renderAutoPanel()}}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.1.0';
+var APP_VERSION='1.2.0';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
