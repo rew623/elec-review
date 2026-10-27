@@ -1,8 +1,8 @@
 /* 서비스워커 — 앱 파일을 바꾸면 VERSION 을 올린다(index.html 의 APP_VERSION 과 같게). */
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const SHELL_CACHE = 'shell-' + VERSION;
 const FONT_CACHE = 'fonts-v1';
-const SHELL = ['./', 'index.html', 'kec-data.js', 'law-data.js', 'pdf.min.js', 'pdf.worker.min.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+const SHELL = ['./', 'index.html', 'kec-data.js', 'law-data.js', 'kds-data.js', 'pdf.min.js', 'pdf.worker.min.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   // 새 버전은 대기 상태로 두고, 사용자가 "업데이트"를 누르면 SKIP_WAITING 으로 활성화
