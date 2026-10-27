@@ -1360,6 +1360,22 @@ var STUDY=[
    {t:'다른 금속 전선의 접속은 단자·접속기 사용',r:['L:kcs321010:3.1.2']}],
   site:['자재 승인(KS·인증) 확인 후 반입 검수','절연저항·접지저항 측정 입회','은폐 전 배관·배선 검측 사진'],
   ph:['전기공사 절연저항 측정','배관 은폐 전 검측']},
+ {id:'cost',ic:'🧮',t:'내역서(표준품셈) 검토',why:'일상감사에서 내역서 공량이 표준품셈과 해설에 맞는지 봅니다. 할증 중복, 이미 포함된 품의 별도 계상이 자주 지적됩니다.',
+  chk:[
+   {t:'할증은 곱하지 않고 더한다: W = P × (1 + a1 + a2 + …)',d:'예: 천장 속 130%와 4층 할증을 곱해서 계상하면 과다입니다.',r:['L:pum:1-11-16']},
+   {t:'공구손료는 직접노무비의 3%까지',r:['L:pum:1-21']},
+   {t:'소운반 20 m 이내는 품에 포함, 초과분만 별도 계상',r:['L:pum:1-15']},
+   {t:'전선관: 콘크리트 매입 기준, 노출 120%, 천장 속·마루 밑 130%, 지중 70%(굴착 별도), 교실 등 동일 반복공정 90%',d:'학교 교실 배관에 90%를 적용했는지, 여러 관을 동시에 배관해도 관마다 품을 적용했는지 봅니다. 철거 30%.',r:['L:pum:5-1']},
+   {t:'전선관 부속품률: PVC·후강·박강 15~20%, CD관 40%, 가요관 10~15% — 커플링·부싱·커넥터·로크너트를 따로 넣으면 중복',r:['L:pum:5-2']},
+   {t:'케이블트레이: 사다리형 기준, 통풍·밀폐형 120%, 높이 4 m 이상 120%, 세퍼레이터·커버 각 20% — 접지 본딩·먹줄·인서트·지지금구는 포함(별도 계상 금지)',r:['L:pum:5-8']},
+   {t:'트레이 내진버팀대: 2개 1세트, 1개면 80%, 앵커·전산볼트 포함',r:['L:pum:5-8-1']},
+   {t:'분전반: 완제품 설치 시 차단기 개별 품 합산의 35%, 노출 설치 90%, 누전차단기는 배선용차단기 품 준용',r:['L:pum:5-18']},
+   {t:'LED 등기구: 지지금구·결선·소운반 포함, 매입형 천장 구멍뚫기만 별도, 램프만 교체는 10%',r:['L:pum:5-25-3']},
+   {t:'옥내배선(관 내): 바닥 공사 80%, 몰딩 내 130%, 접속 포함, 철거 30%',r:['L:pum:5-10']},
+   {t:'몰딩·레이스웨이는 지지금구(앵커) 설치품을 별도 계상하면 안 됨',r:['L:pum:5-9','L:pum:5-9-1']},
+   {t:'발생재(작업부산물)는 설계 때 90% 공제',r:['L:pum:1-14']}],
+  site:['기성 검측 때 실제 시공 방법(노출·매입·천장 속)이 내역 할증과 같은지','설계변경 시 수량 변동분 정산','완제품 분전반을 조립품으로 계상하지 않았는지'],
+  ph:[]},
  {id:'fire',ic:'🚒',t:'비상콘센트·화재탐지·비상방송',why:'전기 도면에 소방 전원·배선이 함께 그려지는 경우가 많습니다.',
   chk:[
    {t:'비상콘센트 대상·전원: 7층 이상이면서 연면적 2,000 ㎡ 이상 등은 비상전원',r:['L:f504:2.1']},
@@ -1384,6 +1400,7 @@ function studyTopics(){
   if(/수변전|수전|변전|단선결선|큐비클|배전반|발전기/.test(title))on.sub=1;
   if(/피뢰|접지|돌침|인하도선/.test(title))on.ltn=1;
   if(/시방|주기사항|범례|일반사항/.test(title))on.gen=1;
+  if(/내역|산출|수량/.test(title))on.cost=1;
   if(has(/태양광|태양전지|인버터|PV\b/))on.pv=1;
   if(/비상콘센트|자동화재|감지기|비상방송|소방/.test(title))on.fire=1;
   return {title:title,list:STUDY.filter(function(s){return on[s.id]})};
@@ -1391,7 +1408,7 @@ function studyTopics(){
 function refChip(r){
   if(r.indexOf('Q:')===0)return '<button type="button" class="chip" data-kq="'+esc(r.slice(2))+'">🔎 '+esc(r.slice(2))+'</button>';
   var id=r.indexOf('K:')===0?r.slice(2):r,lab;
-  if(id.indexOf('L:')===0){var p=id.split(':'),nm={pv:'건축물 설비기준 규칙',sch:'학교보건법 시행규칙',en:'에너지절약설계기준',es:'전기안전관리법 시행규칙',f303:'NFTC 303',f304:'NFTC 304',f504:'NFTC 504',f203:'NFTC 203',f202:'NFTC 202',re:'재생에너지법 시행령',re2:'재생에너지 설비 규정',chk:'검사·점검 고시'}[p[1]]||(/^k[dc]s\d{6}$/.test(p[1])?p[1].slice(0,3).toUpperCase()+' '+p[1].slice(3,5)+' '+p[1].slice(5,7)+' '+p[1].slice(7,9):p[1]);lab=nm+' '+p.slice(2).join(':')}
+  if(id.indexOf('L:')===0){var p=id.split(':'),nm={pv:'건축물 설비기준 규칙',sch:'학교보건법 시행규칙',en:'에너지절약설계기준',es:'전기안전관리법 시행규칙',f303:'NFTC 303',f304:'NFTC 304',f504:'NFTC 504',f203:'NFTC 203',f202:'NFTC 202',re:'재생에너지법 시행령',re2:'재생에너지 설비 규정',chk:'검사·점검 고시',pum:'표준품셈',pumhs:'품셈 해설서',pumrev:'품셈 개정'}[p[1]]||(/^k[dc]s\d{6}$/.test(p[1])?p[1].slice(0,3).toUpperCase()+' '+p[1].slice(3,5)+' '+p[1].slice(5,7)+' '+p[1].slice(7,9):p[1]);lab=nm+' '+p.slice(2).join(':')}
   else lab='KEC '+id;
   return '<button type="button" class="chip" data-kec="'+esc(id)+'">📖 '+esc(lab)+'</button>';
 }
@@ -1401,7 +1418,7 @@ function studyCard(s,open){
    '<div class="mini sw2">'+esc(s.why)+'</div>'+
    '<ol class="schk">'+s.chk.map(function(c){return '<li><span class="tag '+(c.a?'auto':'man')+'">'+(c.a?'자동':'직접')+'</span><div><div>'+esc(c.t)+'</div>'+(c.d?'<div class="mini">'+esc(c.d)+'</div>':'')+(c.r?'<div class="chips">'+c.r.map(refChip).join('')+'</div>':'')+'</div></li>'}).join('')+'</ol>'+
    '<div class="ssite"><b>🏗️ 공사감독 때 볼 것</b><ul>'+s.site.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>'+
-   '<div class="chips sph"><span class="mini">📷 시공 사진 찾아보기:</span>'+s.ph.map(function(x){return '<a class="chip" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q='+q(x)+'">'+esc(x)+'</a>'}).join('')+'</div></details>';
+   (s.ph.length?'<div class="chips sph"><span class="mini">📷 시공 사진 찾아보기:</span>':'<div hidden>')+s.ph.map(function(x){return '<a class="chip" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q='+q(x)+'">'+esc(x)+'</a>'}).join('')+'</div></details>';
 }
 function bindStudy(root){
   bindJumps(root);
@@ -1834,15 +1851,15 @@ function loadKEC(){
     d.idx={};d.c.forEach(function(c,i){d.idx[c.n]=i;c.T=c.t.toLowerCase().replace(/\s+/g,'');c.L=c.b.toLowerCase().replace(/\s+/g,'')});
     /* 법령·기준(law-data.js): 못 불러와도 KEC 검색은 그대로 쓴다 */
     d.laws={d:[],got:''};
-    for(var si=0;si<2;si++){try{
-      var gv=['LAW_B64','KDS_B64'][si],fn=['law-data.js','kds-data.js'][si];
+    for(var si=0;si<3;si++){try{
+      var gv=['LAW_B64','KDS_B64','PUM_B64'][si],fn=['law-data.js','kds-data.js','pum-data.js'][si];
       if(!window[gv])await new Promise(function(ok){var s=document.createElement('script');s.src=fn;s.onload=ok;s.onerror=ok;document.head.appendChild(s)});
       if(!window[gv])continue;
       var lb=atob(window[gv].replace(/\s+/g,'')),lu=new Uint8Array(lb.length);for(var j=0;j<lb.length;j++)lu[j]=lb.charCodeAt(j);
       var LD=JSON.parse(await new Response(new Blob([lu]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
       if(si===0)d.laws.got=LD.got;
-      LD.d.forEach(function(doc){d.laws.d.push(doc);var kds=/^k[dc]s/.test(doc.k);doc.c.forEach(function(c){
-        var e={n:'L:'+doc.k+':'+c.n,t:c.t,b:c.b,law:doc.name,num:c.n,ef:doc.meta&&doc.meta.ef,kds:kds,adm:/고시|공고|훈령|예규/.test(doc.meta&&doc.meta.type||'')};
+      LD.d.forEach(function(doc){d.laws.d.push(doc);var kds=/^k[dc]s/.test(doc.k),pum=/^pum/.test(doc.k);doc.c.forEach(function(c){
+        var e={n:'L:'+doc.k+':'+c.n,t:c.t,b:c.b,law:doc.name,num:c.n,ef:doc.meta&&doc.meta.ef,kds:kds,pum:pum,adm:/고시|공고|훈령|예규/.test(doc.meta&&doc.meta.type||'')};
         e.T=(e.t+' '+e.law).toLowerCase().replace(/\s+/g,'');e.L=e.b.toLowerCase().replace(/\s+/g,'');
         d.idx[e.n]=d.c.length;d.c.push(e);
       })});
@@ -1915,7 +1932,7 @@ function kecDetail(n){
   if(i==null){out.innerHTML='<div class="card empty2">'+esc(n)+' 조항을 찾지 못했습니다.</div>';return}
   var c=KEC.c[i],terms=kecTerms(($('kecQ').value||'').trim()).filter(function(t){return !/^\d/.test(t)});
   var parent=c.n.indexOf('.')>0?c.n.replace(/\.\d+$/,''):null,kids=KEC.c.filter(function(x){return x.n.indexOf(c.n+'.')===0&&x.n.split('.').length===c.n.split('.').length+1});
-  var src=c.kds?'국가건설기준 '+esc(c.ef||'')+' · <a href="https://www.kcsc.re.kr" target="_blank" rel="noopener">국가건설기준센터</a>':c.law?'시행 '+kdate(c.ef)+' · <a href="https://www.law.go.kr/'+(c.adm?'행정규칙':'법령')+'/'+encodeURIComponent(c.law)+'" target="_blank" rel="noopener">국가법령정보센터에서 보기</a>':'원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)';
+  var src=c.pum?'제공받은 PDF에서 추출(표·그림은 원문 확인)':c.kds?'국가건설기준 '+esc(c.ef||'')+' · <a href="https://www.kcsc.re.kr" target="_blank" rel="noopener">국가건설기준센터</a>':c.law?'시행 '+kdate(c.ef)+' · <a href="https://www.law.go.kr/'+(c.adm?'행정규칙':'법령')+'/'+encodeURIComponent(c.law)+'" target="_blank" rel="noopener">국가법령정보센터에서 보기</a>':'원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)';
   var h='<div class="card"><div class="ch"><span class="no">'+esc(c.law?c.num:'KEC '+c.n)+'</span><b style="font-size:17px">'+esc(c.t)+'</b><span class="mini">'+(c.law?esc(c.law)+' · ':'')+src+'</span></div>'+
     '<div class="chips" style="margin:10px 0">'+(($('kecQ').value||'').trim()?'<button type="button" class="chip" id="kBack">← 검색 결과</button>':'')+
     (i>0?'<button type="button" class="chip" data-k2="'+esc(KEC.c[i-1].n)+'">◀ '+esc(kno(KEC.c[i-1]))+'</button>':'')+
@@ -2385,7 +2402,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale;window.__app.renderAutoPanel=function(){renderAutoPanel()};window.__app.STUDY=STUDY;window.__app.loadKEC=loadKEC}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.3.0';
+var APP_VERSION='1.4.0';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
