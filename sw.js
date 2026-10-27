@@ -1,5 +1,5 @@
 /* 서비스워커 — 앱 파일을 바꾸면 VERSION 을 올린다(index.html 의 APP_VERSION 과 같게). */
-const VERSION = '1.5.3';
+const VERSION = '1.5.4';
 const SHELL_CACHE = 'shell-' + VERSION;
 const FONT_CACHE = 'fonts-v1';
 const SHELL = ['./', 'index.html', 'kec-data.js', 'law-data.js', 'kds-data.js', 'pum-data.js', 'pdf.min.js', 'pdf.worker.min.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];

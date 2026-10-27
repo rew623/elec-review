@@ -496,6 +496,7 @@ async function loadPage(n){
       }catch(e){}
     })();
   }
+  try{localStorage.setItem(lastPageKey(),String(n))}catch(e){}
   S.pageNum=n;S.pw=vp.width;S.ph=vp.height;S.segs=segs;S.fills=fills;S.texts=texts;
   buildDark();
   var pn='';
@@ -1521,7 +1522,26 @@ function loadIn(){
 function saveIn(){try{localStorage.setItem('ed-in-'+fileKey(),JSON.stringify({len:S.set.len,cur:S.set.cur,kindRow:S.set.kindRow,trays:S.set.trays}))}catch(e){}}
 
 /* ---------- 전체 분석(쪽마다 글자만 읽음) ---------- */
+/* 도면 전체 분석 결과를 기기에 저장 → 앱을 다시 켜면 다시 훑지 않고 바로 쓴다 */
+function scanKey(){return S.file?S.file.name+'|'+S.file.size+'|'+(S.file.lastModified||0):''}
+var SCANSAVE={
+  put:function(v){return PDFSAVE.db().then(function(d){return new Promise(function(res,rej){var t=d.transaction('f','readwrite');t.objectStore('f').put(v,'scan');t.oncomplete=res;t.onerror=rej})})},
+  get:function(){return PDFSAVE.db().then(function(d){return new Promise(function(res,rej){var t=d.transaction('f','readonly'),q=t.objectStore('f').get('scan');t.oncomplete=function(){res(q.result||null)};t.onerror=rej})})}
+};
+function lastPageKey(){return 'ed-last-'+scanKey()}
 async function scanAll(){
+  try{var sv=await SCANSAVE.get();
+    if(sv&&sv.key===scanKey()&&sv.ver===1&&S.pdf&&sv.an&&sv.an.pages===S.pdf.numPages){
+      S.idx=sv.rows;S.an=sv.an;S.rev=null;S.autoOpened=true;S.userPicked=false;
+      if(S.an.supply&&S.an.supply.kv&&!S.set.recvManual)S.set.recv=S.an.supply.kv>=1?'high':'low';
+      loadIn();setProg(1);setStatus('저장해 둔 분석 결과를 불러왔습니다 · '+S.file.name+' · '+S.an.pages+'쪽');
+      runReview();fillPageSelect();
+      var lp=0;try{lp=parseInt(localStorage.getItem(lastPageKey())||'0',10)}catch(e){}
+      var first=lp||((S.idx.filter(function(r){return cellKey(r.no,r.page)==='5'&&/평면도/.test(r.title||'')&&!/확대|PIT/.test(r.title||'')})[0]||S.idx.filter(function(r){return r.no})[0]||{page:1}).page);
+      if(!S.segs.length){setTab('qty');loadPage(first)}
+      return;
+    }
+  }catch(e){}
   var pdf=S.pdf,n=pdf.numPages,rows=[],LT={},panels=[],scheds=[],trays={},supply={kv:0,kva:0,kvs:{},tr:[]},textPages=0;
   S.idx=null;S.rev=null;S.autoOpened=false;S.userPicked=false;S.an={sched:[],schedPage:0,panels:[],supply:null,textPages:0,pages:n};
   renderAll();
@@ -1569,6 +1589,7 @@ async function scanAll(){
   if(supply.kv&&!S.set.recvManual)S.set.recv=supply.kv>=1?'high':'low';
   loadIn();
   setProg(1);setStatus('분석 완료 · '+S.file.name+' · '+n+'쪽');
+  try{SCANSAVE.put({ver:1,key:scanKey(),rows:rows,an:S.an,at:Date.now()}).catch(function(){})}catch(e){}
   runReview();
   fillPageSelect();
   var first=rows.filter(function(r){return cellKey(r.no,r.page)==='5'&&/평면도/.test(r.title||'')&&!/확대|PIT/.test(r.title||'')})[0]||rows.filter(function(r){return r.no})[0];
@@ -1896,7 +1917,7 @@ function renderKEC(){
   }
   loadKEC().then(function(d){
     var nk=d.c.filter(function(c){return !c.law}).length;
-    $('kecVer').innerHTML=esc(d.title+' '+d.ver+' · 조항 '+nk.toLocaleString()+'개 · 출처: '+d.src)+(d.laws&&d.laws.d.length?'<br>법령·기준·건설기준 '+d.laws.d.length+'종 '+(d.c.length-nk)+'개 조문 (법령은 국가법령정보센터 '+esc(d.laws.got)+' 받음, KDS·KCS는 제공받은 원문): '+d.laws.d.map(function(x){return esc(x.name)}).join(', '):'');markSrc();
+    $('kecVer').innerHTML='<details><summary>KEC 조항 '+nk.toLocaleString()+'개'+(d.laws&&d.laws.d.length?' · 법령·기준·건설기준·품셈 '+d.laws.d.length+'종 '+(d.c.length-nk).toLocaleString()+'개':'')+' — 자료 목록 보기</summary><div style="margin-top:6px">'+esc(d.title+' '+d.ver+' · 출처: '+d.src)+(d.laws&&d.laws.d.length?'<br>법령은 국가법령정보센터('+esc(d.laws.got)+' 받음), KDS·KCS·품셈·절차서는 제공받은 원문: '+d.laws.d.map(function(x){return esc(x.name)}).join(', '):'')+'</div></details>';markSrc();
     if(S.kSel)kecDetail(S.kSel);else kecResults();
   },function(e){$('kecOut').innerHTML='<div class="banner warn">'+esc(e.message||String(e))+'</div>'});
 }
@@ -2409,7 +2430,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale;window.__app.renderAutoPanel=function(){renderAutoPanel()};window.__app.STUDY=STUDY;window.__app.loadKEC=loadKEC}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.5.3';
+var APP_VERSION='1.5.4';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
