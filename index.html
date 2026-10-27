@@ -390,16 +390,28 @@ async function loadPage(n){
   var V=vp.transform;
   var ol=await page.getOperatorList();
   var fn=ol.fnArray,ar=ol.argsArray;
-  var ctm=[1,0,0,1,0,0],lw=1,dark=true,stack=[],cur=[];
-  var segs=[];
+  var ctm=[1,0,0,1,0,0],lw=1,dark=true,fdark=true,stack=[],cur=[];
+  var segs=[],fills=[];
   function full(){return mul(V,ctm)}
   function sc(){var m=full();return Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]))}
   function pushSeg(pts){cur.push(pts)}
   function commit(){
+    var pc=polyCircle();if(pc&&dark)fills.push(pc);
     var s=sc(),w=lw*s,dk=dark;
     for(var i=0;i<cur.length;i++){segs.push({p:cur[i],lw:w,dk:dk})}
     cur=[];
   }
+  function polyCircle(){ /* 짧은 직선 여러 개로 근사한 원(채운 점·선으로 그린 고리)을 찾는다 */
+    if(cur.length<8||cur.length>48)return null;
+    var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,i;
+    for(i=0;i<cur.length;i++){var q=cur[i];if(q.length!==4)return null;x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1])}
+    var w=x1-x0,h=y1-y0;
+    if(w<0.2||Math.abs(w-h)>0.08*(w+h)/2)return null;
+    var cx=(x0+x1)/2,cy=(y0+y1)/2,r=(w+h)/4;
+    for(i=0;i<cur.length;i++)if(Math.abs(Math.hypot(cur[i][0]-cx,cur[i][1]-cy)-r)>0.1*r)return null;
+    return {cx:cx,cy:cy,r:r};
+  }
+  function commitFill(){var c=fdark!==false?polyCircle():null;if(c){c.filled=true;fills.push(c)}cur=[]}
   function readPath(ops,coords){ // 구버전 형식
     var m=full(),ci=0,px=0,py=0,sx=0,sy=0,pt;
     for(var i=0;i<ops.length;i++){
@@ -433,23 +445,25 @@ async function loadPage(n){
   var strokeOps={};[OPS.stroke,OPS.closeStroke,OPS.fillStroke,OPS.eoFillStroke,OPS.closeFillStroke,OPS.closeEOFillStroke].forEach(function(o){strokeOps[o]=1});
   for(var i=0;i<fn.length;i++){
     var f=fn[i],a=ar[i];
-    if(f===OPS.save){stack.push([ctm,lw,dark])}
-    else if(f===OPS.restore){var st=stack.pop();if(st){ctm=st[0];lw=st[1];dark=st[2]}}
+    if(f===OPS.save){stack.push([ctm,lw,dark,fdark])}
+    else if(f===OPS.restore){var st=stack.pop();if(st){ctm=st[0];lw=st[1];dark=st[2];fdark=st[3]}}
     else if(f===OPS.transform){ctm=mul(ctm,a)}
-    else if(f===OPS.paintFormXObjectBegin){stack.push([ctm,lw,dark]);if(a&&a[0])ctm=mul(ctm,a[0])}
-    else if(f===OPS.paintFormXObjectEnd){var st2=stack.pop();if(st2){ctm=st2[0];lw=st2[1];dark=st2[2]}}
+    else if(f===OPS.paintFormXObjectBegin){stack.push([ctm,lw,dark,fdark]);if(a&&a[0])ctm=mul(ctm,a[0])}
+    else if(f===OPS.paintFormXObjectEnd){var st2=stack.pop();if(st2){ctm=st2[0];lw=st2[1];dark=st2[2];fdark=st2[3]}}
     else if(f===OPS.setLineWidth){lw=a[0]}
     else if(f===OPS.setGState){var g=a[0]||[];for(var k=0;k<g.length;k++){if(g[k][0]==='LW')lw=g[k][1]}}
     else if(f===OPS.setStrokeRGBColor||f===OPS.setStrokeGray||f===OPS.setStrokeColor){var c=parseColor(a);if(c!==null)dark=c}
+    else if(f===OPS.setFillRGBColor||f===OPS.setFillGray||f===OPS.setFillColor){var fc=parseColor(a);if(fc!==null)fdark=fc}
     else if(f===OPS.setStrokeCMYKColor){dark=(a.length>=4)?(1-Math.min(1,(a[0]+a[3])))<0.3&&true:dark}
     else if(f===OPS.constructPath){
       if(typeof a[0]==='number'){ // 신버전: [그리기코드, [데이터], minMax]
         var d=a[1][0]||a[1];readPathNew(d);
-        if(strokeOps[a[0]]||a[0]===OPS.stroke)commit();else cur=[];
+        if(strokeOps[a[0]]||a[0]===OPS.stroke)commit();else if(a[0]===OPS.fill||a[0]===OPS.eoFill)commitFill();else cur=[];
       }else{readPath(a[0],a[1])}
     }
     else if(strokeOps[f]){commit()}
-    else if(f===OPS.fill||f===OPS.eoFill||f===OPS.endPath||f===OPS.closeFillStroke&&false){cur=[]}
+    else if(f===OPS.fill||f===OPS.eoFill){commitFill()}
+    else if(f===OPS.endPath){cur=[]}
   }
   /* 글자 */
   var texts=[];
@@ -463,7 +477,7 @@ async function loadPage(n){
     });
   }catch(e){}
   /* 정리 */
-  S.pageNum=n;S.pw=vp.width;S.ph=vp.height;S.segs=segs;S.texts=texts;
+  S.pageNum=n;S.pw=vp.width;S.ph=vp.height;S.segs=segs;S.fills=fills;S.texts=texts;
   buildDark();
   var pn='';
   var joined=texts.map(function(t){return t.s}).join(' ');
@@ -1767,36 +1781,35 @@ function bestScale(sel,name,excl){
 
 /* ---------- 원형 심벌(B·F형): 곡선 조각을 끝점으로 이어 원을 찾고, 반지름 비율로 축척을 따로 구한다 ---------- */
 function findCircles(segs){
-  var cs=segs.filter(function(s){return s.p.length===8}),par=cs.map(function(_,i){return i});
-  function f(i){while(par[i]!==i){par[i]=par[par[i]];i=par[i]}return i}
-  var ep={},q=0.05;
-  function key(x,y){return Math.round(x/q)+','+Math.round(y/q)}
-  cs.forEach(function(s,i){[[s.p[0],s.p[1]],[s.p[6],s.p[7]]].forEach(function(e){
-    for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){var l=ep[(Math.round(e[0]/q)+a)+','+(Math.round(e[1]/q)+b)];if(l)l.forEach(function(j){if(Math.hypot(cs[j].ep[0]-e[0],cs[j].ep[1]-e[1])<q||Math.hypot(cs[j].ep[2]-e[0],cs[j].ep[3]-e[1])<q)par[f(i)]=f(j)})}
+  /* 곡선 조각마다 시작·중간·끝 세 점을 지나는 원을 구해 같은 원끼리 묶는다(이웃한 원과 맞닿아 있어도 따로 센다) */
+  var cl=[],grid={};
+  segs.forEach(function(s){
+    if(s.p.length!==8)return;
+    var p=s.p,t=0.5,u=1-t;
+    var mx=u*u*u*p[0]+3*u*u*t*p[2]+3*u*t*t*p[4]+t*t*t*p[6],my=u*u*u*p[1]+3*u*u*t*p[3]+3*u*t*t*p[5]+t*t*t*p[7];
+    var ax=p[0],ay=p[1],bx=mx,by=my,cx=p[6],cy=p[7];
+    var d=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));if(Math.abs(d)<1e-9)return;
+    var a2=ax*ax+ay*ay,b2=bx*bx+by*by,c2=cx*cx+cy*cy;
+    var ox=(a2*(by-cy)+b2*(cy-ay)+c2*(ay-by))/d,oy=(a2*(cx-bx)+b2*(ax-cx)+c2*(bx-ax))/d,r=Math.hypot(ax-ox,ay-oy);
+    if(r<0.3||r>40)return;
+    var chord=Math.hypot(p[6]-p[0],p[7]-p[1]),ang=2*Math.asin(Math.min(1,chord/(2*r)));
+    var gx=Math.floor(ox/1),gy=Math.floor(oy/1),hit=null;
+    for(var i=gx-1;i<=gx+1&&!hit;i++)for(var j=gy-1;j<=gy+1&&!hit;j++){
+      var l=grid[i+','+j];if(!l)continue;
+      for(var m=0;m<l.length;m++){var c=l[m];if(Math.hypot(c.cx-ox,c.cy-oy)<0.03+0.03*r&&Math.abs(c.r-r)<0.05*r){hit=c;break}}
+    }
+    if(!hit){hit={cx:ox,cy:oy,r:r,segs:[],ang:0};(grid[gx+','+gy]||(grid[gx+','+gy]=[])).push(hit);cl.push(hit)}
+    hit.segs.push(s);hit.ang+=ang;
   });
-    s.ep=[s.p[0],s.p[1],s.p[6],s.p[7]];
-    [[s.p[0],s.p[1]],[s.p[6],s.p[7]]].forEach(function(e){(ep[key(e[0],e[1])]||(ep[key(e[0],e[1])]=[])).push(i)});
-  });
-  var comp={};cs.forEach(function(s,i){(comp[f(i)]||(comp[f(i)]=[])).push(s)});
-  var out=[];
-  Object.keys(comp).forEach(function(k){
-    var c=comp[k];if(c.length<2)return;
-    var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-    c.forEach(function(s){x0=Math.min(x0,s.bx0);y0=Math.min(y0,s.by0);x1=Math.max(x1,s.bx1);y1=Math.max(y1,s.by1)});
-    var w=x1-x0,h=y1-y0,r=(w+h)/4;
-    if(r<0.3||Math.abs(w-h)>0.06*(w+h)/2)return;
-    var cx=(x0+x1)/2,cy=(y0+y1)/2,ok=true;
-    c.forEach(function(s){for(var i=0;i<8;i+=6)if(Math.abs(Math.hypot(s.p[i]-cx,s.p[i+1]-cy)-r)>0.06*r)ok=false});
-    if(ok)out.push({cx:cx,cy:cy,r:r,segs:c});
-  });
-  return out;
+  return cl.filter(function(c){return c.ang>=5.4});
 }
 /* 틀(sel) 안의 가장 큰 원을 기준으로, 도면의 원 반지름 분포에서 축척 후보를 만들어 센다 */
 function circleHits(sel,qty,excl){
   var cl=findCircles(sel);if(!cl.length)return null;
   var o=cl.reduce(function(a,b){return b.r>a.r?b:a});
-  var rest=sel.filter(function(s){return o.segs.indexOf(s)<0});
-  var plan=(S.circles||[]).filter(function(c){return !(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
+  var twin=cl.filter(function(c){return Math.hypot(c.cx-o.cx,c.cy-o.cy)<0.1*o.r&&c.r>=0.8*o.r});
+  var rest=sel.filter(function(s){return !twin.some(function(c){return c.segs.indexOf(s)>=0})&&Math.max(s.w,s.h)>=0.12*o.r});
+  var plan=(S.circles||[]).concat(S.fills||[]).filter(function(c){return !(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
   var hist={};plan.forEach(function(c){var k=c.r/o.r;if(k<0.15||k>2.5)return;var kk=Math.round(k*100)/100;hist[kk]=(hist[kk]||0)+1});
   var ks=Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).sort(function(a,b){return b.n-a.n}).slice(0,10);
   var tol0=parseFloat($('tol').value)||0.15,all=$('rot').checked,best=null;
@@ -2061,7 +2074,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.2';
+var APP_VERSION='1.0.3';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
