@@ -477,6 +477,19 @@ async function loadPage(n){
     });
   }catch(e){}
   /* 정리 */
+  /* 글자 정보(ToUnicode)가 없는 PDF는 읽은 글자가 깨져 도면 위 글자가 안 보인다 → pdf.js가 그린 글자 그림을 바탕으로 깔아 준다 */
+  S.bg=null;
+  var bad=texts.filter(function(t){return /[^\u0020-\u007e\uac00-\ud7af\u3131-\u318e\u3200-\u33ff\u00b2\u00b3\u00b0-\u00bf\u2460-\u24ff]/.test(t.s)}).length;
+  if(texts.length>20&&bad/texts.length>0.25){
+    (async function(){
+      try{
+        var sc=Math.min(4,Math.sqrt(1.2e7/(vp.width*vp.height))),vp2=page.getViewport({scale:sc});
+        var c=document.createElement('canvas');c.width=Math.round(vp2.width);c.height=Math.round(vp2.height);
+        await page.render({canvasContext:c.getContext('2d'),viewport:vp2}).promise;
+        if(S.pageNum===n){S.bg=c;draw()}
+      }catch(e){}
+    })();
+  }
   S.pageNum=n;S.pw=vp.width;S.ph=vp.height;S.segs=segs;S.fills=fills;S.texts=texts;
   buildDark();
   var pn='';
@@ -651,6 +664,7 @@ function paint(){
   /* 용지 */
   ctx.strokeStyle=css('--seg2');ctx.lineWidth=1/k;ctx.strokeRect(0,0,S.pw,S.ph);
   var x0=v.x,y0=v.y,x1=v.x+W/k,y1=v.y+H/k;
+  if(S.bg)ctx.drawImage(S.bg,0,0,S.pw,S.ph);
   /* 선: 회색과 검정을 각각 한 번에 */
   var seg=css('--seg'),seg2=css('--seg2'),minw=1/k;
   [[false,seg2],[true,seg]].forEach(function(pass){
@@ -666,7 +680,7 @@ function paint(){
     ctx.strokeStyle=pass[1];ctx.lineWidth=pass[0]?Math.max(0.35,minw):Math.max(0.15,minw);ctx.stroke();
   });
   /* 글자 */
-  if(v.z>=1.6){
+  if(v.z>=1.6&&!S.bg){
     ctx.fillStyle=css('--muted');
     for(var t=0;t<S.texts.length;t++){
       var T=S.texts[t];if(T.x<x0-80||T.x>x1+80||T.y<y0-80||T.y>y1+80)continue;
@@ -2074,7 +2088,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.3';
+var APP_VERSION='1.0.4';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
