@@ -782,7 +782,16 @@ function endPtr(e){
 cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
 cv.addEventListener('wheel',function(e){e.preventDefault();var p=pos(e);zoomAt(e.deltaY<0?1.25:0.8,p.x,p.y)},{passive:false});
 
-$('pdfFile').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];if(f)openPdf(f)});
+/* 마지막으로 연 도면은 이 기기 브라우저(IndexedDB)에 저장해 두고, 앱을 다시 켜면 자동으로 연다(서버로는 보내지 않음) */
+var PDFSAVE={
+  db:function(){return new Promise(function(res,rej){var q=indexedDB.open('elec-review-pdf',1);q.onupgradeneeded=function(){q.result.createObjectStore('f')};q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}})},
+  put:function(f){return PDFSAVE.db().then(function(d){return new Promise(function(res,rej){var t=d.transaction('f','readwrite');t.objectStore('f').put(f,'last');t.objectStore('f').put({name:f.name,type:f.type,mod:f.lastModified},'meta');t.oncomplete=res;t.onerror=rej})})},
+  get:function(){return PDFSAVE.db().then(function(d){return new Promise(function(res,rej){var t=d.transaction('f','readonly'),a=t.objectStore('f').get('last'),m=t.objectStore('f').get('meta');t.oncomplete=function(){res(a.result?{blob:a.result,meta:m.result||{}}:null)};t.onerror=rej})})}
+};
+$('pdfFile').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];if(f){openPdf(f);PDFSAVE.put(f).catch(function(){toast('도면을 이 기기에 저장하지 못했습니다(저장 공간 부족일 수 있음). 다시 켜면 다시 열어야 합니다.',5000)})}});
+setTimeout(function(){
+  try{PDFSAVE.get().then(function(r){if(r&&!S.pdf&&!S.loading){var m=r.meta;openPdf(new File([r.blob],m.name||'도면.pdf',{type:m.type||'application/pdf',lastModified:m.mod||Date.now()}))}}).catch(function(){})}catch(e){}
+},800);
 $('goPage').addEventListener('click',function(){loadPage(parseInt($('pageNo').value,10)||1)});
 $('pageNo').addEventListener('keydown',function(e){if(e.key==='Enter')loadPage(parseInt($('pageNo').value,10)||1)});
 $('modePan').addEventListener('click',function(){setMode('pan')});
@@ -1653,7 +1662,7 @@ function kecResults(){
   });
   h+='</div>';if(!res.length)h='<div class="card empty2">찾는 조항이 없습니다. 낱말을 줄이거나 다르게 써 보세요.</div>';
   out.innerHTML=h;
-  out.querySelectorAll('[data-k]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k;kecDetail(b.dataset.k);window.scrollTo({top:0})})});
+  out.querySelectorAll('[data-k]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k;kecDetail(b.dataset.k)})});
 }
 function kecDetail(n){
   var out=$('kecOut'),i=KEC.idx[n];
@@ -1671,7 +1680,7 @@ function kecDetail(n){
   if(kids.length)h+='<div class="mini" style="margin-top:12px">세부 조항</div><div class="chips" style="margin-top:6px">'+kids.map(function(k){return '<button type="button" class="chip" data-k2="'+k.n+'">'+k.n+' '+esc(k.t)+'</button>'}).join('')+'</div>';
   h+='</div>';
   out.innerHTML=h;
-  out.querySelectorAll('[data-k2]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k2;kecDetail(b.dataset.k2);window.scrollTo({top:0})})});
+  out.querySelectorAll('[data-k2]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k2;kecDetail(b.dataset.k2)})});
   var kb=$('kBack');if(kb)kb.addEventListener('click',function(){S.kSel=null;kecResults()});
   $('kCopy').addEventListener('click',function(){var t='KEC '+c.n+' '+c.t+'\n'+c.b;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast('조항을 복사했습니다.')},function(){toast('복사하지 못했습니다.')});});
 }
@@ -2088,7 +2097,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.4';
+var APP_VERSION='1.0.5';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
