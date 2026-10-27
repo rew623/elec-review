@@ -680,11 +680,11 @@ function paint(){
     ctx.strokeStyle=pass[1];ctx.lineWidth=pass[0]?Math.max(0.35,minw):Math.max(0.15,minw);ctx.stroke();
   });
   /* 글자 */
-  if(v.z>=1.6&&!S.bg){
+  if(!S.bg){
     ctx.fillStyle=css('--muted');
     for(var t=0;t<S.texts.length;t++){
       var T=S.texts[t];if(T.x<x0-80||T.x>x1+80||T.y<y0-80||T.y>y1+80)continue;
-      if(T.z*v.z<5)continue;
+      if(T.z*v.z<2.5)continue;
       ctx.save();ctx.translate(T.x,T.y);ctx.rotate(T.r);ctx.font=T.z+'px sans-serif';ctx.fillText(T.s,0,0);ctx.restore();
     }
   }
@@ -1877,6 +1877,16 @@ function circleHits(sel,qty,excl){
   var o=cl.reduce(function(a,b){return b.r>a.r?b:a});
   var twin=cl.filter(function(c){return Math.hypot(c.cx-o.cx,c.cy-o.cy)<0.1*o.r&&c.r>=0.8*o.r});
   var rest=sel.filter(function(s){return !twin.some(function(c){return c.segs.indexOf(s)>=0})&&Math.max(s.w,s.h)>=0.12*o.r});
+  /* 원 한가운데 점(B형 등)이 있는지: 같은 크기 원이라도 점이 있고 없고로 구분한다 */
+  var hasDot=sel.some(function(s){return !twin.some(function(c){return c.segs.indexOf(s)>=0})&&Math.max(s.w,s.h)<0.3*o.r&&Math.hypot(s.cx-o.cx,s.cy-o.cy)<0.4*o.r});
+  function planDot(c){
+    var ok=(S.fills||[]).some(function(f){return f.filled&&f.r<0.5*c.r&&Math.hypot(f.cx-c.cx,f.cy-c.cy)<0.3*c.r});
+    if(ok)return true;
+    var cell=S.cell,gx=Math.floor(c.cx/cell),gy=Math.floor(c.cy/cell),rr=Math.ceil(c.r*0.5/cell)+1;
+    for(var a=gx-rr;a<=gx+rr;a++)for(var b=gy-rr;b<=gy+rr;b++){var l=S.grid[a*8192+b];if(!l)continue;
+      for(var i=0;i<l.length;i++){var q=l[i];if(Math.max(q.w,q.h)<0.45*c.r&&Math.hypot(q.cx-c.cx,q.cy-c.cy)<0.4*c.r&&c.segs.indexOf(q)<0)return true}}
+    return false;
+  }
   var plan=(S.circles||[]).concat(S.fills||[]).filter(function(c){return !(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
   var hist={};plan.forEach(function(c){var k=c.r/o.r;if(k<0.15||k>2.5)return;var kk=Math.round(k*100)/100;hist[kk]=(hist[kk]||0)+1});
   var ks=Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).sort(function(a,b){return b.n-a.n}).slice(0,10);
@@ -1886,6 +1896,7 @@ function circleHits(sel,qty,excl){
     var T=rest.length?variants(g,all):[[]],hits=[];
     plan.forEach(function(c){
       if(Math.abs(c.r/o.r-kc.k)>0.03*kc.k)return;
+      if(planDot(c)!==hasDot)return;
       var tol=Math.max(tol0,0.04*c.r),found=false;
       for(var v=0;v<T.length&&!found;v++){
         var ok=0;T[v].forEach(function(t){if(near(t.cx+c.cx,t.cy+c.cy,t.w,t.h,tol))ok++});
@@ -1961,7 +1972,15 @@ async function runLegend(L,pn){
         }
       }
       var simple=sel.length&&sel.length<=2&&sel.every(function(s){return s.p.length===4});
-      var grp={id:Date.now()+Math.random(),auto:true,name:name,type:it.type,desc:it.desc,qty:it.qty,status:status,simple:simple,
+      /* 선 하나 모양(A형 등): 옆에 스위치 회로 표시 소문자(a·b·c…)가 적힌 것만 센다 */
+      var letters=S.texts.filter(function(t){return /^[a-z]$/.test(t.s.trim())});
+      var lfilter=false;
+      if(simple&&hits.length&&letters.length>=5){
+        var rad=1.6*Math.max(g?g.tw:4,4)+3;
+        var kept=hits.filter(function(h){return letters.some(function(t){return Math.hypot(t.x+t.w/2-h.x,t.y-t.z*0.35-h.y)<=rad})});
+        if(kept.length){hits=kept;lfilter=true}
+      }
+      var grp={id:Date.now()+Math.random(),auto:true,name:name,type:it.type,desc:it.desc,qty:it.qty,status:status,simple:simple,lfilter:lfilter,
         color:AUTO_COL[ci++%AUTO_COL.length],expected:it.qty==null?'':String(it.qty),
         tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:status!=='guess'||true,key:key,legend:li};
       S.groups.push(grp);S.auto.items.push(grp);
@@ -2074,7 +2093,7 @@ function renderAutoPanel(){
     h+='<div class="atbl">';
     A.items.forEach(function(g){
       var n=count(g),act=S.active===g.id;
-      h+='<div class="arow'+(act?' act':'')+'" data-g="'+g.id+'"><span class="sw" style="background:'+g.color+'"></span><div class="an"><b>'+esc(g.type)+'형</b> <span class="mini">'+esc(g.desc||'')+'</span>'+(g.simple&&g.status!=='none'?'<div class="mini">선 하나 모양이라 다른 선이 섞일 수 있음</div>':'')+'</div>'+
+      h+='<div class="arow'+(act?' act':'')+'" data-g="'+g.id+'"><span class="sw" style="background:'+g.color+'"></span><div class="an"><b>'+esc(g.type)+'형</b> <span class="mini">'+esc(g.desc||'')+'</span>'+(g.simple&&g.status!=='none'?'<div class="mini">'+(g.lfilter?'선 하나 모양 — 옆에 스위치 소문자가 있는 것만 셈':'선 하나 모양이라 다른 선이 섞일 수 있음')+'</div>':'')+'</div>'+
         '<div class="aq"><b>'+n+'</b><span class="mini">/ 표 '+(g.qty==null?'-':g.qty)+'</span></div>'+stLabel(g)+
         '<div class="ab"><button type="button" data-go="'+g.id+'">보기</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
     });
@@ -2142,7 +2161,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.6';
+var APP_VERSION='1.0.7';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
