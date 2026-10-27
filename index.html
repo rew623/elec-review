@@ -164,6 +164,7 @@ section.view{display:flex;flex-direction:column;gap:12px}
 .banner.info{background:var(--infobg);color:var(--info)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .chip{border-radius:99px;min-height:34px;padding:4px 12px;font-size:13px}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
 @media (min-width:900px){.list.two{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1396,7 +1397,7 @@ function counts(){
 }
 function renderAll(){renderTabs();renderSum();renderCls();renderCab();renderGuide()}
 function renderTabs(){
-  var c=counts(),t=[['qty','📐 도면 보기'],['sum','📊 전체 검토'],['cab','🔌 간선·분전반 표'],['cls','🗂️ 도면 목록'],['kec','📖 KEC 검색'],['gd','📋 검토 가이드']];
+  var c=counts(),t=[['qty','📐 도면 보기'],['sum','📊 전체 검토'],['cab','🔌 간선·분전반 표'],['cls','🗂️ 도면 목록'],['kec','📖 법규 검색'],['gd','📋 검토 가이드']];
   var box=$('tabs2');box.innerHTML='';
   t.forEach(function(a){
     var b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',S.tab===a[0]?'true':'false');
@@ -1643,7 +1644,7 @@ $('clsFind').addEventListener('input',renderCls);
 
 /* ---------- KEC 검색 (원문 내장, 인터넷 불필요) ---------- */
 var KEC=null,KEC_LOADING=null;
-var KEC_QUICK=[['232.3.9','전압강하'],['142.3.2','보호도체'],['212.4.1','과부하 보호 협조'],['232.5','허용전류'],['232.41','케이블트레이공사'],['211.2.4','누전차단기'],['234.5','콘센트'],['142','접지시스템'],['151','피뢰시스템'],['522','태양광설비']];
+var KEC_QUICK=[['L:pv:제20조','피뢰설비'],['L:sch:별표 2','교실 조도'],['L:en:제10조','에너지 전기부문'],['L:f303:2.1','유도등'],['L:f304:2.1','비상조명등'],['L:f504:2.1','비상콘센트'],['232.3.9','전압강하'],['142.3.2','보호도체'],['212.4.1','과부하 보호 협조'],['232.5','허용전류'],['232.41','케이블트레이공사'],['211.2.4','누전차단기'],['234.5','콘센트'],['142','접지시스템'],['151','피뢰시스템'],['522','태양광설비']];
 function loadKEC(){
   if(KEC)return Promise.resolve(KEC);
   if(KEC_LOADING)return KEC_LOADING;
@@ -1656,6 +1657,20 @@ function loadKEC(){
     var st=new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'));
     var d=JSON.parse(await new Response(st).text());
     d.idx={};d.c.forEach(function(c,i){d.idx[c.n]=i;c.T=c.t.toLowerCase().replace(/\s+/g,'');c.L=c.b.toLowerCase().replace(/\s+/g,'')});
+    /* 법령·기준(law-data.js): 못 불러와도 KEC 검색은 그대로 쓴다 */
+    try{
+      if(!window.LAW_B64)await new Promise(function(ok){var s=document.createElement('script');s.src='law-data.js';s.onload=ok;s.onerror=ok;document.head.appendChild(s)});
+      if(window.LAW_B64){
+        var lb=atob(window.LAW_B64.replace(/\s+/g,'')),lu=new Uint8Array(lb.length);for(var j=0;j<lb.length;j++)lu[j]=lb.charCodeAt(j);
+        var LD=JSON.parse(await new Response(new Blob([lu]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+        d.laws=LD;
+        LD.d.forEach(function(doc){doc.c.forEach(function(c){
+          var e={n:'L:'+doc.k+':'+c.n,t:c.t,b:c.b,law:doc.name,num:c.n,ef:doc.meta&&doc.meta.ef,adm:/고시|공고|훈령|예규/.test(doc.meta&&doc.meta.type||'')};
+          e.T=(e.t+' '+e.law).toLowerCase().replace(/\s+/g,'');e.L=e.b.toLowerCase().replace(/\s+/g,'');
+          d.idx[e.n]=d.c.length;d.c.push(e);
+        })});
+      }
+    }catch(e){}
     KEC=d;return d;
   })();
   KEC_LOADING.catch(function(){KEC_LOADING=null});
@@ -1670,18 +1685,26 @@ function hl(text,terms){
 function renderKEC(){
   var box=$('v-kec');
   if(!$('kecQ')){
-    box.innerHTML='<div class="card"><h2>📖 한국전기설비규정(KEC) 검색</h2><div class="mini" id="kecVer">원문을 여는 중…</div>'+
-      '<div class="cls-top" style="margin-top:10px"><input id="kecQ" type="text" placeholder="조항번호(232.3.9) 또는 낱말(전압강하, 케이블트레이, 누전차단기)" aria-label="KEC 검색"></div>'+
+    box.innerHTML='<div class="card"><h2>📖 KEC·전기 관련 법규 검색</h2><div class="mini" id="kecVer">원문을 여는 중…</div>'+
+      '<div class="cls-top" style="margin-top:10px"><input id="kecQ" type="text" placeholder="조항번호(232.3.9) 또는 낱말(전압강하, 피뢰, 유도등, 조도)" aria-label="KEC 검색"></div>'+
+      '<div class="chips" id="kecSrc" style="margin-top:8px"><button type="button" class="chip" data-src="all">전체</button><button type="button" class="chip" data-src="kec">KEC만</button><button type="button" class="chip" data-src="law">법령·기준만</button></div>'+
       '<div class="chips" id="kecQuick" style="margin-top:8px"></div></div><div id="kecOut"></div>';
+    S.kSrc=S.kSrc||'all';
+    $('kecSrc').querySelectorAll('[data-src]').forEach(function(b){b.addEventListener('click',function(){S.kSrc=b.dataset.src;markSrc();S.kSel=null;kecResults()})});
     $('kecQ').addEventListener('input',function(){S.kSel=null;S.kq=this.value;kecResults()});
-    $('kecQuick').innerHTML=KEC_QUICK.map(function(q){return '<button type="button" class="chip" data-kec="'+q[0]+'">'+q[0]+' '+q[1]+'</button>'}).join('');
+    $('kecQuick').innerHTML=KEC_QUICK.map(function(q){return '<button type="button" class="chip" data-kec="'+esc(q[0])+'">'+(q[0].indexOf('L:')===0?'':q[0]+' ')+q[1]+'</button>'}).join('');
     bindJumps($('kecQuick'));
   }
   loadKEC().then(function(d){
-    $('kecVer').textContent=d.title+' '+d.ver+' · 조항 '+d.c.length.toLocaleString()+'개 · 출처: '+d.src+'. 이 파일 안에 들어 있어 인터넷 없이 검색됩니다.';
+    var nk=d.c.filter(function(c){return !c.law}).length;
+    $('kecVer').innerHTML=esc(d.title+' '+d.ver+' · 조항 '+nk.toLocaleString()+'개 · 출처: '+d.src)+(d.laws?'<br>법령·기준 '+d.laws.d.length+'종 '+(d.c.length-nk)+'개 조문 (국가법령정보센터, '+esc(d.laws.got)+' 받음): '+d.laws.d.map(function(x){return esc(x.name)}).join(', '):'');markSrc();
     if(S.kSel)kecDetail(S.kSel);else kecResults();
   },function(e){$('kecOut').innerHTML='<div class="banner warn">'+esc(e.message||String(e))+'</div>'});
 }
+function kno(c){return c.law?c.num:c.n}
+function kname(c){return c.law?c.law+' '+c.num:'KEC '+c.n}
+function kdate(v){v=String(v||'');return v.length===8?v.slice(0,4)+'.'+v.slice(4,6)+'.'+v.slice(6):v}
+function markSrc(){var b=$('kecSrc');if(b)b.querySelectorAll('[data-src]').forEach(function(x){x.classList.toggle('on',x.dataset.src===S.kSrc)})}
 function kecTerms(q){return q.toLowerCase().split(/\s+/).filter(Boolean).map(function(t){return t})}
 function kecResults(){
   var out=$('kecOut'),q=($('kecQ').value||'').trim();if(!KEC)return;
@@ -1692,6 +1715,7 @@ function kecResults(){
   }else{
     var terms=kecTerms(q).map(function(t){return t.replace(/\s+/g,'')});
     KEC.c.forEach(function(c){
+      if(S.kSrc==='kec'&&c.law||S.kSrc==='law'&&!c.law)return;
       var ok=true,s=0;
       terms.forEach(function(t){var inT=c.T.indexOf(t)>=0,cnt=c.L.split(t).length-1;if(!inT&&!cnt)ok=false;s+=(inT?50:0)+Math.min(cnt,20)});
       if(ok)res.push({c:c,s:s});
@@ -1703,7 +1727,7 @@ function kecResults(){
     var c=r.c,snip='';
     if(!/^\d/.test(q)){var t=terms2[0],raw=c.b,ix=raw.toLowerCase().indexOf(t);if(ix<0)ix=0;snip=raw.slice(Math.max(0,ix-50),ix+110).replace(/\s+/g,' ')}
     else snip=c.b.slice(0,140).replace(/\s+/g,' ');
-    h+='<button type="button" class="card kres" data-k="'+c.n+'"><div class="ch"><span class="no">'+c.n+'</span><b>'+hl(c.t,terms2)+'</b><span class="mini">원문 '+(c.p||'-')+'쪽</span></div><div class="cs" style="margin:4px 0 0">'+hl(snip,terms2)+'…</div></button>';
+    h+='<button type="button" class="card kres" data-k="'+esc(c.n)+'"><div class="ch"><span class="no">'+esc(kno(c))+'</span><b>'+hl(c.t,terms2)+'</b><span class="mini">'+(c.law?esc(c.law):'KEC 원문 '+(c.p||'-')+'쪽')+'</span></div><div class="cs" style="margin:4px 0 0">'+hl(snip,terms2)+'…</div></button>';
   });
   h+='</div>';if(!res.length)h='<div class="card empty2">찾는 조항이 없습니다. 낱말을 줄이거나 다르게 써 보세요.</div>';
   out.innerHTML=h;
@@ -1715,11 +1739,12 @@ function kecDetail(n){
   if(i==null){out.innerHTML='<div class="card empty2">'+esc(n)+' 조항을 찾지 못했습니다.</div>';return}
   var c=KEC.c[i],terms=kecTerms(($('kecQ').value||'').trim()).filter(function(t){return !/^\d/.test(t)});
   var parent=c.n.indexOf('.')>0?c.n.replace(/\.\d+$/,''):null,kids=KEC.c.filter(function(x){return x.n.indexOf(c.n+'.')===0&&x.n.split('.').length===c.n.split('.').length+1});
-  var h='<div class="card"><div class="ch"><span class="no">KEC '+c.n+'</span><b style="font-size:17px">'+esc(c.t)+'</b><span class="mini">원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)</span></div>'+
+  var src=c.law?'시행 '+kdate(c.ef)+' · <a href="https://www.law.go.kr/'+(c.adm?'행정규칙':'법령')+'/'+encodeURIComponent(c.law)+'" target="_blank" rel="noopener">국가법령정보센터에서 보기</a>':'원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)';
+  var h='<div class="card"><div class="ch"><span class="no">'+esc(c.law?c.num:'KEC '+c.n)+'</span><b style="font-size:17px">'+esc(c.t)+'</b><span class="mini">'+(c.law?esc(c.law)+' · ':'')+src+'</span></div>'+
     '<div class="chips" style="margin:10px 0">'+(($('kecQ').value||'').trim()?'<button type="button" class="chip" id="kBack">← 검색 결과</button>':'')+
-    (i>0?'<button type="button" class="chip" data-k2="'+KEC.c[i-1].n+'">◀ '+KEC.c[i-1].n+'</button>':'')+
+    (i>0?'<button type="button" class="chip" data-k2="'+esc(KEC.c[i-1].n)+'">◀ '+esc(kno(KEC.c[i-1]))+'</button>':'')+
     (parent&&KEC.idx[parent]!=null?'<button type="button" class="chip" data-k2="'+parent+'">↑ '+parent+'</button>':'')+
-    (i<KEC.c.length-1?'<button type="button" class="chip" data-k2="'+KEC.c[i+1].n+'">'+KEC.c[i+1].n+' ▶</button>':'')+
+    (i<KEC.c.length-1?'<button type="button" class="chip" data-k2="'+esc(KEC.c[i+1].n)+'">'+esc(kno(KEC.c[i+1]))+' ▶</button>':'')+
     '<button type="button" class="chip" id="kCopy">복사</button></div>'+
     '<div class="kecb">'+(c.b?hl(c.b,terms):'<span class="mini">(이 조항은 제목만 있고 내용은 아래 세부 조항에 있습니다)</span>')+'</div>';
   if(kids.length)h+='<div class="mini" style="margin-top:12px">세부 조항</div><div class="chips" style="margin-top:6px">'+kids.map(function(k){return '<button type="button" class="chip" data-k2="'+k.n+'">'+k.n+' '+esc(k.t)+'</button>'}).join('')+'</div>';
@@ -1727,7 +1752,7 @@ function kecDetail(n){
   out.innerHTML=h;
   out.querySelectorAll('[data-k2]').forEach(function(b){b.addEventListener('click',function(){S.kSel=b.dataset.k2;kecDetail(b.dataset.k2)})});
   var kb=$('kBack');if(kb)kb.addEventListener('click',function(){S.kSel=null;kecResults()});
-  $('kCopy').addEventListener('click',function(){var t='KEC '+c.n+' '+c.t+'\n'+c.b;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast('조항을 복사했습니다.')},function(){toast('복사하지 못했습니다.')});});
+  $('kCopy').addEventListener('click',function(){var t=kname(c)+' '+c.t+'\n'+c.b;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast('조항을 복사했습니다.')},function(){toast('복사하지 못했습니다.')});});
 }
 
 /* ---------- 배관·트레이 화면 ---------- */
@@ -2184,7 +2209,7 @@ function fillPageSelect(){
 setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;window.__app.autoPage=autoPage;window.__app.circleHits=circleHits;window.__app.circleScale=circleScale}},0);
 
 /* ---------- 앱 설치·업데이트 (웹 주소로 열었을 때만) ---------- */
-var APP_VERSION='1.0.8';
+var APP_VERSION='1.1.0';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
