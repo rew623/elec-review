@@ -1448,7 +1448,7 @@ function studyTopics(){
 function refChip(r){
   if(r.indexOf('Q:')===0)return '<button type="button" class="chip" data-kq="'+esc(r.slice(2))+'">🔎 '+esc(r.slice(2))+'</button>';
   var id=r.indexOf('K:')===0?r.slice(2):r,lab;
-  if(id.indexOf('L:')===0){var p=id.split(':'),nm={pv:'건축물 설비기준 규칙',sch:'학교보건법 시행규칙',en:'에너지절약설계기준',es:'전기안전관리법 시행규칙',f303:'NFTC 303',f304:'NFTC 304',f504:'NFTC 504',f203:'NFTC 203',f202:'NFTC 202',re:'재생에너지법 시행령',re2:'재생에너지 설비 규정',chk:'검사·점검 고시',ew:'전기공사업법',ewd:'전기공사업법 시행령',ewr:'전기공사업법 시행규칙',pt:'전력기술관리법',ptd:'전력기술관리법 시행령',esl:'전기안전관리법',sup:'공사감리업무 수행지침',tech:'전기설비기술기준',pum:'표준품셈',pumhs:'품셈 해설서',pumrev:'품셈 개정',proc:'📷 공사 절차서'}[p[1]]||(/^k[dc]s\d{6}$/.test(p[1])?p[1].slice(0,3).toUpperCase()+' '+p[1].slice(3,5)+' '+p[1].slice(5,7)+' '+p[1].slice(7,9):p[1]);lab=nm+' '+p.slice(2).join(':')}
+  if(id.indexOf('L:')===0){var p=id.split(':'),nm={pv:'건축물 설비기준 규칙',sch:'학교보건법 시행규칙',en:'에너지절약설계기준',es:'전기안전관리법 시행규칙',f303:'NFTC 303',f304:'NFTC 304',f504:'NFTC 504',f203:'NFTC 203',f202:'NFTC 202',re:'재생에너지법 시행령',re2:'재생에너지 설비 규정',chk:'검사·점검 고시',ew:'전기공사업법',ewd:'전기공사업법 시행령',ewr:'전기공사업법 시행규칙',pt:'전력기술관리법',ptd:'전력기술관리법 시행령',esl:'전기안전관리법',sup:'공사감리업무 수행지침',tech:'전기설비기술기준',man:'📘 학교건축 표준업무매뉴얼',rel:'📘 단계별 관계법령',bid:'📘 사업발주',pum:'표준품셈',pumhs:'품셈 해설서',pumrev:'품셈 개정',proc:'📷 공사 절차서'}[p[1]]||(/^k[dc]s\d{6}$/.test(p[1])?p[1].slice(0,3).toUpperCase()+' '+p[1].slice(3,5)+' '+p[1].slice(5,7)+' '+p[1].slice(7,9):p[1]);lab=nm+' '+p.slice(2).join(':')}
   else lab='KEC '+id;
   return '<button type="button" class="chip" data-kec="'+esc(id)+'">📖 '+esc(lab)+'</button>';
 }
@@ -1458,7 +1458,7 @@ function studyCard(s,open){
    '<div class="mini sw2">'+esc(s.why)+'</div>'+
    '<ol class="schk">'+s.chk.map(function(c){return '<li><span class="tag '+(c.a?'auto':'man')+'">'+(c.a?'자동':'직접')+'</span><div><div>'+esc(c.t)+'</div>'+(c.d?'<div class="mini">'+esc(c.d)+'</div>':'')+(c.r?'<div class="chips">'+c.r.map(refChip).join('')+'</div>':'')+'</div></li>'}).join('')+'</ol>'+
    '<div class="ssite"><b>🏗️ 공사감독 때 볼 것</b><ul>'+s.site.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'+
-   (STUDY_FLOW[s.id]?flowChips(STUDY_FLOW[s.id]):'')+(s.pr&&s.pr.length?'<div class="chips" style="margin-top:6px"><span class="mini">📷 작업 순서·사진(서울시 공사 절차서):</span>'+s.pr.map(function(n){return '<button type="button" class="chip" data-kec="L:proc:'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'')+'</div>'+
+   (STUDY_FLOW[s.id]?flowChips(STUDY_FLOW[s.id]):'')+(STUDY_EDU[s.id]?'<div class="chips"><span class="mini">📘 학교건축 표준업무매뉴얼:</span>'+STUDY_EDU[s.id].map(eduChip).join('')+'</div>':'')+(s.pr&&s.pr.length?'<div class="chips" style="margin-top:6px"><span class="mini">📷 작업 순서·사진(서울시 공사 절차서):</span>'+s.pr.map(function(n){return '<button type="button" class="chip" data-kec="L:proc:'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'')+'</div>'+
    (s.ph.length?'<div class="chips sph"><span class="mini">📷 시공 사진 찾아보기:</span>':'<div hidden>')+s.ph.map(function(x){return '<a class="chip" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q='+q(x)+'">'+esc(x)+'</a>'}).join('')+'</div></details>';
 }
 function bindStudy(root){
@@ -1478,15 +1478,31 @@ function renderStudyPanel(){
 
 setTimeout(function(){_renderAutoPanel0=renderAutoPanel;renderAutoPanel=function(){_renderAutoPanel0.apply(this,arguments);try{renderStudyPanel()}catch(e){}}},0);
 var FLOW=[
+ {id:'plan0',no:'00',c:'#495057',t:'학교시설사업 기획',short:'기획',d:'사업계획·사전기획·투자심사·각종 심의·예산 — 전기 설계 조건이 정해지는 출발점(학교건축 표준업무매뉴얼 1장)',tasks:[
+  {id:'biz',t:'사업계획·사전기획',why:'총사업비 규모에 따라 거치는 절차가 다릅니다. 500억 이상: 학생배치계획 → 사전기획 → 타당성조사 → 공유재산심의 → 중앙투자심사 → 공공건축심의 → 예산수립 / 300억 이상: 타당성조사 없이 중앙투자심사 / 40억 이상: 자체투자심사 / 10억 이상: 투자심사 없음.',who:['교육(지원)청','학교','사전기획 전문가'],steps:[
+   {t:'학생배치계획 수립·학교건축 가능 여부 검토',r:['L:man:1.1.1']},
+   {t:'사업발주 사전 체크리스트 작성(건물별 연면적·층수·안전등급·석면, 학생배치, 일정, 사업비)',d:'전기 분야는 여기서 연면적·층수로 전기설계·감리 분리발주, 건축전기설비기술사 협력(연면적 1만㎡ 이상), 신재생 의무(1,000㎡ 이상), 수변전 증설 여부를 미리 판단합니다.',r:['L:bid:체크리스트','L:rel:06','L:rel:17']},
+   {t:'사전기획(설계비 추정가격 1억원 이상)과 적정성 검토',r:['L:man:1.1.2','L:rel:02','L:bid:과업Ⅰ-7']},
+   {t:'교육환경평가·도시계획시설 결정 등 사전행정절차',r:['L:rel:02']}],site:[]},
+  {id:'review',t:'투자심사·공유재산·공공건축심의·예산',who:['교육(지원)청'],steps:[
+   {t:'지방교육재정 투자심사(자체 40억원 이상, 중앙 300억원 이상)',r:['L:man:1.2','L:rel:02']},
+   {t:'공유재산심의·공유재산관리계획',r:['L:man:1.3','L:rel:02']},
+   {t:'공공건축심의(설계비 추정가격 5천만원 이상)',r:['L:man:1.4','L:rel:02']},
+   {t:'예산 수립',r:['L:man:1.5']},
+   {t:'일상감사·계약심사·계약심의위원회',r:['L:man:2.3.9','L:man:2.3.10','L:rel:27']}],site:[]},
+  {id:'safety0',t:'기본안전보건대장·사업관리방식·설계공모',who:['발주기관'],steps:[
+   {t:'기본안전보건대장(총공사금액 50억 이상, 설계발주 전)',r:['L:man:1.6','L:rel:04']},
+   {t:'건설공사 사업관리방식 검토(건설사업관리·감독권한대행·직접감독)',r:['L:man:1.7','L:rel:28']},
+   {t:'설계발주·설계공모(설계비 추정가격 1억원 이상)',r:['L:man:2.1.1','L:man:2.1.2','L:rel:03']}],site:[]}]},
  {id:'design',no:'01',c:'#3b5bdb',t:'설계하고 검토',short:'설계',d:'부하·수전 계획부터 설비별 설계, 도면·수량 검토까지 — 이 앱의 도면 검토 기능이 쓰이는 단계',tasks:[
-  {id:'plan',t:'설계 조건·부하 계획',why:'기본계획 → 기본설계 → 실시설계 순서로 구체화합니다. 처음에 인입·수전 방식과 전기실 공간을 잘못 잡으면 뒤에서 되돌리기 어렵습니다.',who:['설계자','발주기관','건축설계자'],steps:[
+  {id:'plan',t:'설계 조건·부하 계획',edu:['L:man:2.2.1','L:man:2.2.4 가','L:man:2.2.4 나','L:man:2.2.4 다','L:rel:17','L:rel:18','L:rel:25'],why:'기본계획 → 기본설계 → 실시설계 순서로 구체화합니다. 처음에 인입·수전 방식과 전기실 공간을 잘못 잡으면 뒤에서 되돌리기 어렵습니다.',who:['설계자','발주기관','건축설계자'],steps:[
    {t:'현장 조사·발주기관 요구사항 정리',d:'인입 위치(한전 공급 방식), 기존 설비, 증축이면 기존 수전 용량 여유를 확인합니다.',r:['L:kds321010:2','L:kds321010:1.7.2']},
    {t:'부하 산정 → 수전 용량·수전 방식 결정',d:'조명·콘센트·동력·냉난방 부하를 모아 변압기 용량과 저압/고압 수전을 정합니다.',r:['L:kds322010:1.1','L:kds321010:1.7.3']},
    {t:'전기실·발전기실·ES(전기샤프트) 공간 확보',d:'기기 배치 최소 이격거리와 실 면적·높이를 건축 도면에 반영시킵니다.',r:['L:kds321011:4.1.4','L:kds321011:4.1.5','L:kds321011:4.4.4','L:pv:제20조의2']},
    {t:'에너지절약·재생에너지 의무 검토',d:'공공건축물은 에너지절약설계기준 의무사항과 재생에너지 설치 의무 비율을 설계에 넣습니다.',r:['L:kds321010:1.7.6','L:en:제10조','L:re:제15조','L:re:제16조']},
    {t:'실시설계 성과물(도면·시방서·설계설명서·계산서·내역서) 작성',r:['L:kds321010:1.7.4','L:kds321010:1.7.5']}],
    site:['증축 공사면 기존 수전설비 여유·노후도를 먼저 확인','전기실 위치가 침수 우려 없는 곳인지, 반입구·환기가 되는지']},
-  {id:'sys',t:'설비별 설계 기준',why:'설비마다 KDS 설계기준과 KEC 시설 기준이 함께 적용됩니다. 도면 종류별로 아래 기준을 펼쳐 보세요.',who:['설계자'],steps:[
+  {id:'sys',t:'설비별 설계 기준',edu:['L:man:2.2.4 가','L:man:2.2.4 나','L:man:2.2.4 다','L:man:2.2.4 라','L:man:2.2.4 마','L:man:2.2.4 바','L:man:2.2.5','L:man:2.2.6'],why:'설비마다 KDS 설계기준과 KEC 시설 기준이 함께 적용됩니다. 도면 종류별로 아래 기준을 펼쳐 보세요.',who:['설계자'],steps:[
    {t:'수변전설비 — 변압기·차단기·보호협조',r:['L:kds322010:1.1','K:351']},
    {t:'예비전원(발전기·UPS)',r:['L:kds322020:1.1']},
    {t:'간선·배선 — 허용전류, 전압강하, 과부하 협조, 보호도체',d:'앱이 간선표에서 전압강하·허용전류·보호도체를 자동 계산합니다.',r:['L:kds322510:1.1','K:232.5','K:232.3.9','K:212.4.1','K:142.3.2'],app:[{go:'cab'},{go:'sum'}]},
@@ -1498,36 +1514,36 @@ var FLOW=[
    {t:'약전·감시제어·방범',r:['L:kds323540:1.1','L:kds323510:1.1','L:kds324040:1.1']},
    {t:'내진설계(트레이·분전반·기기 고정)',r:['L:kds321710:1.1']}],
    site:[]},
-  {id:'drw',t:'도면 검토(이 앱)',why:'도면 PDF를 올리면 쪽마다 종류를 판단하고, 자동으로 셀 수 있는 것은 세고, 사람이 볼 것은 근거와 함께 보여 줍니다.',who:['설계자','감리원','공사감독'],steps:[
+  {id:'drw',t:'도면 검토(이 앱)',edu:['L:man:2.2.4 라','L:man:2.2.4 마','L:man:2.2.4 다'],why:'도면 PDF를 올리면 쪽마다 종류를 판단하고, 자동으로 셀 수 있는 것은 세고, 사람이 볼 것은 근거와 함께 보여 줍니다.',who:['설계자','감리원','공사감독'],steps:[
    {t:'도면 PDF 열기 → 도면 목록·분류 확인',d:'도면번호·제목으로 전등·전열·간선·분전반 등을 나눕니다.',app:[{go:'qty',l:'📐 도면 열기'},{go:'cls'}]},
    {t:'전등 평면도: 전등표 수량 = 도면 심벌 수',d:'‘보기’로 잘못 잡은 것을 확인·보정해 도면 수량을 확정합니다. 기호가 빠진 등기구(꺾임 표시·작은 점)도 따로 셉니다.',app:[{go:'qty'}]},
    {t:'전선 가닥수(배선 위 빗금)와 배관 규격',d:'빗금 개수 = 가닥수. 가닥수별 길이와 주기사항의 CD관 규격을 함께 봅니다.',app:[{go:'qty'}]},
    {t:'분전반·간선: 차단기 정격 vs 케이블 허용전류, 전압강하, 보호도체',r:['K:212.4.1','K:232.3.9','K:142.3.2'],app:[{go:'cab'},{go:'sum'}]},
    {t:'도면 종류별 검토 노트(공부 자료)',app:[{go:'gd'}]}],
    site:[]},
-  {id:'boq',t:'수량산출·내역 검토',why:'도면 수량을 먼저 확정한 뒤 산출서와 비교해야 산출서에 끌려가지 않습니다.',who:['설계자','적산 담당','감리원'],steps:[
+  {id:'boq',t:'수량산출·내역 검토',edu:['L:man:2.3.2','L:man:2.3.6','L:rel:27'],why:'도면 수량을 먼저 확정한 뒤 산출서와 비교해야 산출서에 끌려가지 않습니다.',who:['설계자','적산 담당','감리원'],steps:[
    {t:'수량 계산 기준·할증률 확인',r:['L:pum:1-5','L:pum:1-6']},
    {t:'도면 수량 확정 → 산출서·집계표(xlsx)와 비교',d:'앱의 ‘산출서·내역 비교’에서 층·타입별로 도면 표 / 자동 집계 / 산출 수량을 나란히 봅니다. 도면 표 오타, 산출 누락, 규격(W) 차이를 찾습니다.',app:[{go:'qty',l:'📑 산출서 비교'}]},
    {t:'품 적용 확인(품셈·해설서)',d:'등기구·배관·배선 품이 해당 항목으로 들어갔는지, 할증(층수·소단위 등) 중복이 없는지 봅니다.',r:['L:pumhs:5-25-3','L:pumhs:5-1','L:pum:1-11-16']},
    {t:'관급자재·사급자재 구분, 규격·인증 일치',d:'전등표 규격(W)과 내역 규격이 다르면 발주 전에 설계자에게 확인합니다.'}],
    site:[]}]},
  {id:'order',no:'02',c:'#b35c1e',t:'발주하고 계약',short:'발주',d:'전기공사 분리발주, 감리 계약, 계약 문서 확인',tasks:[
-  {id:'sep',t:'전기공사 분리발주',why:'전기공사는 원칙적으로 다른 공사와 분리해 발주합니다.',who:['발주기관'],steps:[
+  {id:'sep',t:'전기공사 분리발주',edu:['L:rel:06','L:man:2.1.1'],why:'전기공사는 원칙적으로 다른 공사와 분리해 발주합니다.',who:['발주기관'],steps:[
    {t:'분리발주 원칙과 예외 확인',r:['L:ew:제11조']},
    {t:'분리발주의 예외(시행령)',r:['L:ewd:제8조']},
    {t:'전기공사의 범위·종류, 공사업 등록 확인',r:['L:ew:제2조','L:ewd:제2조','L:ewd:별표 1','L:ew:제4조']},
    {t:'설계·공사감리 용역도 분리발주',r:['L:pt:제14조의3','L:ptd:제27조의6']}],site:[]},
-  {id:'supv',t:'공사감리 발주·감리원 배치',why:'전력시설물 공사는 감리(또는 공사감독)를 거쳐야 하고, 규모에 따라 감리원 배치 기준이 다릅니다.',who:['발주기관','감리업자'],steps:[
+  {id:'supv',t:'공사감리 발주·감리원 배치',edu:['L:rel:28','L:man:1.7','L:man:2.3.5'],why:'전력시설물 공사는 감리(또는 공사감독)를 거쳐야 하고, 규모에 따라 감리원 배치 기준이 다릅니다.',who:['발주기관','감리업자'],steps:[
    {t:'공사감리 대상 확인',r:['L:pt:제12조','L:ptd:제20조']},
    {t:'감리원 자격·배치기준 확인',r:['L:pt:제12조의2','L:ptd:제21조','L:ptd:제22조','L:ptd:별표 3']},
    {t:'감리원 업무 범위',r:['L:ptd:제23조','L:sup:제4조']},
    {t:'설계감리 대상 여부',r:['L:pt:제11조','L:ptd:제18조']}],site:[]},
-  {id:'cont',t:'계약 문서·지급자재 확인',who:['발주기관','시공사'],steps:[
+  {id:'cont',t:'계약 문서·지급자재 확인',edu:['L:man:3.1.1 가','L:man:3.1.1 나','L:man:3.1.1 다','L:rel:27'],who:['발주기관','시공사'],steps:[
    {t:'설계도서 적용 우선순위',d:'시방서·도면·내역서가 서로 다를 때 어느 것을 따르는지 계약 조건과 KCS 일반사항을 봅니다.',r:['L:kcs321010:1.5.1','L:kcs321010:1.3.3']},
    {t:'지급(관급)자재 목록과 인도 시기',r:['L:kcs321010:1.4']},
    {t:'관공서·한전 수속(전기사용 신청 등) 일정',r:['L:kcs321010:1.6']}],site:[]}]},
  {id:'start',no:'03',c:'#2f855a',t:'착공 준비',short:'착공',d:'착공 서류, 설계도서 검토, 자재 승인',tasks:[
-  {id:'doc',t:'착공 서류·시공계획',why:'착공 전에 공정표·시공계획서·시공관리책임자 지정이 갖춰져야 합니다.',who:['시공사','감리원','공사감독'],steps:[
+  {id:'doc',t:'착공 서류·시공계획',edu:['L:man:3.1.2 나','L:man:3.1.2 다','L:man:3.1.3','L:man:3.1.4','L:man:3.1.5','L:rel:29'],why:'착공 전에 공정표·시공계획서·시공관리책임자 지정이 갖춰져야 합니다.',who:['시공사','감리원','공사감독'],steps:[
    {t:'시공관리책임자 지정·통지',r:['L:ew:제17조','L:ewd:제12조의2','L:ewd:제12조','L:ewd:별표 4']},
    {t:'자가용전기설비 공사계획 인가·신고(해당 시)',d:'수전 용량 등 대상이면 착공 전에 공사계획 신고를 합니다.',r:['L:esl:제8조','L:es:제3조','L:es:별표 1']},
    {t:'착공신고서 검토·보고, 공사관계자 합동회의',r:['L:sup:제11조','L:sup:제12조']},
@@ -1535,17 +1551,17 @@ var FLOW=[
    {t:'시공계획서 제출·검토',r:['L:kcs321010:3.3.2','L:sup:제30조']},
    {t:'안전보건 계획',r:['L:kcs321010:1.9','L:kcs321010:3.1.3']},
    {t:'하도급 확인',r:['L:ew:제14조','L:ewd:제10조','L:sup:제13조']}],site:['시공관리책임자가 현장에 실제로 배치됐는지','공정표에 한전 수전·사용전검사 일정이 들어 있는지']},
-  {id:'rev',t:'설계도서 검토·현장 여건',why:'시공 전에 도면끼리, 도면과 현장이 맞는지 먼저 봐야 재시공이 줄어듭니다.',who:['시공사','감리원'],steps:[
+  {id:'rev',t:'설계도서 검토·현장 여건',edu:['L:man:3.1.2 가','L:man:3.2.3'],why:'시공 전에 도면끼리, 도면과 현장이 맞는지 먼저 봐야 재시공이 줄어듭니다.',who:['시공사','감리원'],steps:[
    {t:'설계도서 검토(도면·시방·내역 상호 일치)',d:'이 앱의 도면 검토·산출서 비교를 그대로 씁니다.',r:['L:kcs321010:1.3.3','L:sup:제8조'],app:[{go:'qty'},{go:'sum'}]},
    {t:'경미한 변경 처리 기준',r:['L:kcs321010:1.3.4']},
    {t:'현지 여건조사·타 공종과 겹침 확인',r:['L:sup:제15조','L:kcs321010:3.1.1','L:kcs321010:3.6.3']},
    {t:'시공상세도 작성·승인',r:['L:sup:제31조','L:pum:1-41']}],site:['천장고·덕트·배관과 케이블트레이 간섭','전기실 반입 경로와 기기 크기']},
-  {id:'mat',t:'자재 승인·검수',who:['시공사','감리원','공사감독'],steps:[
+  {id:'mat',t:'자재 승인·검수',edu:['L:man:3.2.1 나'],who:['시공사','감리원','공사감독'],steps:[
    {t:'주요 기자재 공급원 검토·승인',d:'등기구는 전등표 사양(W·광속·효율)과 KS·고효율 인증을 확인합니다.',r:['L:sup:제37조','L:kcs321010:2.1','L:kcs321010:1.7']},
    {t:'주요기자재·지급자재 검수·관리',r:['L:sup:제38조','L:kcs321010:2.2','L:kcs321010:2.3']},
    {t:'발생자재 처리',r:['L:kcs321010:2.4','L:pum:1-14']}],site:['승인 자재와 반입 자재의 모델명·규격이 같은지','케이블 드럼의 규격·제조일·KS 표시']}]},
  {id:'build',no:'04',c:'#9f3a62',t:'시공하며 공사감독',short:'시공·감독',d:'공종별 작업 순서와 감독 체크 — 서울시 공사 절차서 사진과 함께',tasks:[
-  {id:'mng',t:'공사 관리(공정·품질·안전·변경)',why:'공종별 시공과 함께 감리원·공사감독이 매일 챙기는 관리 업무입니다.',who:['감리원','공사감독','시공사'],steps:[
+  {id:'mng',t:'공사 관리(공정·품질·안전·변경)',edu:['L:man:3.2.1 가','L:man:3.2.1 나','L:man:3.2.2','L:rel:30'],why:'공종별 시공과 함께 감리원·공사감독이 매일 챙기는 관리 업무입니다.',who:['감리원','공사감독','시공사'],steps:[
    {t:'작업실적·계획서 검토, 시공확인·검사',r:['L:sup:제32조','L:sup:제33조','L:sup:제34조']},
    {t:'품질관리(중점 관리·검사 요령·검사성과 확인)',r:['L:sup:제24조','L:sup:제25조','L:sup:제27조','L:sup:제28조']},
    {t:'공정관리(진도·부진공정 만회·공정보고)',r:['L:sup:제43조','L:sup:제44조','L:sup:제45조','L:sup:제47조']},
@@ -1554,71 +1570,71 @@ var FLOW=[
    {t:'감리원의 공사 중지 명령',r:['L:pt:제13조','L:sup:제41조']},
    {t:'전기공사의 시공·시공관리 의무(시공사)',r:['L:ew:제16조','L:ew:제22조']}],
    site:['감리일지·검측 체크리스트 기록','변경 시공은 승인 후 진행']},
-  {id:'pipe',t:'배관·박스·케이블트레이',who:['시공사','감리원'],pr:['5-1','5-3','5-3-1','5-4','5-8','5-8-1'],steps:[
+  {id:'pipe',t:'배관·박스·케이블트레이',edu:['L:man:3.2.7 나'],who:['시공사','감리원'],pr:['5-1','5-3','5-3-1','5-4','5-8','5-8-1'],steps:[
    {t:'합성수지관·금속관·가요전선관 시설',r:['K:232.11','K:232.12','K:232.13']},
    {t:'박스·풀박스 위치와 지지',d:'매입 배관은 콘크리트 타설 전에 위치·고정 상태를 확인합니다(타설 후 수정 불가).'},
    {t:'케이블트레이 시설·내진버팀대',r:['K:232.41','L:kds321710:1.1']}],
    site:['타설 전 배관 검측(누락·꺾임·박스 고정)','배관 굴곡·충전율, 관 끝 부싱','트레이 접지 연결과 지지 간격'],ph:['전선관 배관 슬래브 매입 시공','케이블트레이 내진버팀대 시공']},
-  {id:'wire',t:'배선·케이블',tool:['ins'],who:['시공사','감리원'],pr:['5-10','5-11','5-13'],steps:[
+  {id:'wire',t:'배선·케이블',edu:['L:man:3.2.7 나'],tool:['ins'],who:['시공사','감리원'],pr:['5-10','5-11','5-13'],steps:[
    {t:'전선 접속 방법',r:['K:123']},
    {t:'전선 색 구분(L1·L2·L3·N·PE)',r:['K:121.2']},
    {t:'허용전류·전압강하(간선)',r:['K:232.5','K:232.3.9'],app:[{go:'cab'}]},
    {t:'입선 후 절연저항 측정',r:['K:132','L:tech:제52조']}],
    site:['도면 가닥수(빗금)대로 입선됐는지','접속부 절연·박스 안 정리','케이블 굴곡반경·피복 손상'],ph:['HFIX 입선 시공','전력케이블 포설 트레이']},
-  {id:'panel',t:'분전반·차단기',who:['시공사','감리원'],pr:['5-18','5-19','5-20'],steps:[
+  {id:'panel',t:'분전반·차단기',edu:['L:man:3.2.7 가','L:man:3.2.7 라'],who:['시공사','감리원'],pr:['5-18','5-19','5-20'],steps:[
    {t:'차단기 정격 ≤ 케이블 허용전류(과부하 협조)',r:['K:212.4.1'],app:[{go:'cab'}]},
    {t:'누전차단기 시설 대상',r:['K:211.2.4']},
    {t:'보호도체 굵기',r:['K:142.3.2']}],
    site:['결선도와 실제 회로번호·차단기 정격 일치','명판·회로 표시','분전반 고정(내진)과 접지'],ph:['분전반 결선 시공']},
-  {id:'light',t:'배선기구·조명',who:['시공사','감리원'],pr:['5-23-가','5-23-나','5-25-3','5-26-7','5-28'],steps:[
+  {id:'light',t:'배선기구·조명',edu:['L:man:3.2.7 다'],who:['시공사','감리원'],pr:['5-23-가','5-23-나','5-25-3','5-26-7','5-28'],steps:[
    {t:'콘센트 시설',r:['K:234.5']},
    {t:'등기구 시설·지지',r:['K:234.1']},
    {t:'점멸 회로(a·b·c)대로 결선',d:'도면 스위치 소문자와 실제 점등 구역이 같은지 점등 시험으로 확인합니다.',r:['L:en:제10조']}],
    site:['매입등이 천장재에만 얹혀 있지 않은지(보강대)','등기구 수량·위치가 도면과 같은지','교실 조도 측정(필요 시)'],ph:['LED 매입등 보강대 시공','스위치 결선 시공']},
-  {id:'earth',t:'접지·피뢰·서지보호',tool:['gnd'],who:['시공사','감리원'],pr:['5-42-1','5-42-2','5-45-2'],steps:[
+  {id:'earth',t:'접지·피뢰·서지보호',edu:['L:man:3.2.7 사','L:man:3.2.7 아','L:rel:18'],tool:['gnd'],who:['시공사','감리원'],pr:['5-42-1','5-42-2','5-45-2'],steps:[
    {t:'접지시스템 시설',r:['K:142','K:142.6']},
    {t:'피뢰시스템',r:['K:151','K:153','L:pv:제20조']},
    {t:'접지저항·연속성 측정',r:['L:pumhs:3-38']}],
    site:['접지극 매설 깊이·간격 사진 기록(매설 후 확인 불가)','등전위본딩 연결','SPD 설치 위치·접속선 길이'],ph:['접지봉 매설 시공','피뢰 수평도체 시공']},
-  {id:'power',t:'수변전·발전기·UPS',who:['시공사','감리원','전기안전관리자'],pr:['5-43','5-45','5-40'],steps:[
+  {id:'power',t:'수변전·발전기·UPS',edu:['L:man:3.2.7 가','L:man:3.2.7 마'],who:['시공사','감리원','전기안전관리자'],pr:['5-43','5-45','5-40'],steps:[
    {t:'수변전설비 설치',r:['L:kds322010:1.1','K:351']},
    {t:'발전기 설치·시운전',r:['L:kds322020:1.1']},
    {t:'UPS 설치',r:['L:kds322020:1.1']}],
    site:['기기 기초·고정(내진)','케이블 단말 처리','발전기 배기·급기, 연료'],ph:['수배전반 설치','비상발전기 설치']},
-  {id:'weak',t:'약전·소방전기',who:['시공사','감리원'],pr:['5-47','5-52-라'],steps:[
+  {id:'weak',t:'약전·소방전기',edu:['L:man:3.2.7 바','L:man:3.2.8 나','L:rel:22'],who:['시공사','감리원'],pr:['5-47','5-52-라'],steps:[
    {t:'유도등·비상조명등',r:['L:f303:2.2','L:f304:2.1']},
    {t:'자동화재탐지·비상방송',r:['L:f203:2.1','L:f202:2.1']},
    {t:'비상콘센트',r:['L:f504:2.1']},
    {t:'CCTV·방송',r:['L:kcs323540:1.1']}],site:['소방 배선은 내화·내열 배선인지','유도등 위치·방향'],ph:['유도등 설치','CCTV 설치']},
-  {id:'misc',t:'내진·관통부·잡공사',who:['시공사','감리원'],pr:['5-29','5-29-1','5-29-2','5-8-1'],steps:[
+  {id:'misc',t:'내진·관통부·잡공사',edu:['L:man:3.2.4'],who:['시공사','감리원'],pr:['5-29','5-29-1','5-29-2','5-8-1'],steps:[
    {t:'전기설비 내진(고정·스토퍼·버팀대)',r:['L:kds321710:1.1']},
    {t:'벽·바닥 관통부 처리(방화 구획 내화충전)',r:['Q:관통부']},
    {t:'공사기록·사진(매설·은폐 부위)',d:'매설·은폐 부위는 사진으로 남깁니다.',r:['L:sup:제23조','L:kcs321010:1.8','L:kcs321010:3.3.3']}],site:['방화구획 관통부 내화충전재','은폐 전 사진 기록'],ph:['전기 관통부 내화충전']}]},
  {id:'test',no:'05',c:'#5b4b9a',t:'검사하고 준공',short:'준공',d:'시험·측정, 사용전검사, 준공검사와 준공도서',tasks:[
-  {id:'meas',t:'시험·측정·시운전',tool:['ins','gnd'],who:['시공사','감리원'],steps:[
+  {id:'meas',t:'시험·측정·시운전',edu:['L:man:3.3.1'],tool:['ins','gnd'],who:['시공사','감리원'],steps:[
    {t:'절연저항 측정',r:['K:132','L:tech:제52조']},
    {t:'접지저항 측정',r:['K:142','L:pumhs:3-38']},
    {t:'성능시험 계획·점등·동작 시험(회로별)',r:['L:sup:제26조']},
    {t:'시운전 및 유지관리 교육',r:['L:kcs321010:3.5','L:pum:1-30']}],site:['측정값을 회로별로 기록(성적서)']},
-  {id:'use',t:'사용전검사·사용전점검',why:'자가용전기설비는 사용전검사, 일반용은 사용전점검을 받아야 전기를 쓸 수 있습니다.',who:['시공사','전기안전공사','전기안전관리자'],steps:[
+  {id:'use',t:'사용전검사·사용전점검',edu:['L:man:4.2'],why:'자가용전기설비는 사용전검사, 일반용은 사용전점검을 받아야 전기를 쓸 수 있습니다.',who:['시공사','전기안전공사','전기안전관리자'],steps:[
    {t:'사용전검사 대상·기준·절차',r:['L:esl:제9조','L:es:제6조','L:es:별표 3']},
    {t:'검사 신청·준비·실시',r:['L:chk:제16조','L:chk:제17조','L:chk:제19조']},
    {t:'일반용 전기설비 사용전점검',r:['L:es:제11조','L:chk:제6조']}],site:['검사 전 단선결선도·시험성적서 준비','부적합 사항 보완 후 재검사']},
-  {id:'done',t:'준공검사·준공도서',who:['감리원','공사감독','발주기관'],steps:[
+  {id:'done',t:'준공검사·준공도서',edu:['L:man:4.1','L:man:4.3','L:man:4.4','L:man:3.3.2','L:rel:31','L:rel:32'],who:['감리원','공사감독','발주기관'],steps:[
    {t:'예비준공검사',r:['L:sup:제60조']},
    {t:'준공검사(검사자 임명·기간·절차)',r:['L:sup:제55조','L:sup:제56조','L:sup:제57조','L:sup:제59조','L:kcs321010:3.7']},
    {t:'불합격 부분 재시공',r:['L:sup:제58조']},
    {t:'준공도면 검토·확인(실제 시공대로)',r:['L:sup:제61조']},
    {t:'시설물·현장문서 인수인계',r:['L:sup:제63조','L:sup:제64조']}],site:['준공도면이 변경 시공을 반영했는지','예비품·공구·매뉴얼 인계']}]},
  {id:'om',no:'06',c:'#0b7285',t:'유지관리',short:'유지관리',d:'전기안전관리자, 정기검사·점검',tasks:[
-  {id:'mgr',t:'전기안전관리자·정기검사',who:['설치자(학교·기관)','전기안전관리자'],steps:[
+  {id:'mgr',t:'전기안전관리자·정기검사',edu:['L:man:5.1.1','L:man:5.1.2','L:man:5.1.3','L:rel:33'],who:['설치자(학교·기관)','전기안전관리자'],steps:[
    {t:'전기안전관리자 선임(대행 가능 규모)',r:['L:esl:제22조','L:es:제25조','L:es:제26조','L:es:별표 8']},
    {t:'정기검사 대상·시기',r:['L:esl:제11조','L:es:제8조','L:es:별표 4']},
    {t:'안전관리 기록 작성·보존',r:['L:es:제36조']}],site:[]},
-  {id:'defect',t:'하자담보·하자보수',who:['발주기관','시공사'],steps:[
+  {id:'defect',t:'하자담보·하자보수',edu:['L:man:5.2','L:rel:33'],who:['발주기관','시공사'],steps:[
    {t:'전기공사 하자담보책임과 기간',r:['L:ew:제15조의2','L:ewd:제11조의2','L:ewd:별표 3의2']},
    {t:'유지관리 및 하자보수, 하자 의견 제시',r:['L:sup:제65조','L:sup:제66조']}],site:['하자 기간 만료 전 합동 점검']},
-  {id:'chk',t:'설비별 정기 점검',who:['전기안전관리자','유지보수 업체'],pr:['5-45-1','5-47-1'],steps:[
+  {id:'chk',t:'설비별 정기 점검',edu:['L:rel:33'],who:['전기안전관리자','유지보수 업체'],pr:['5-45-1','5-47-1'],steps:[
    {t:'일반용 전기설비 정기점검',r:['L:esl:제12조','L:es:제12조','L:chk:제10조']},
    {t:'UPS·CCTV 등 설비 점검',d:'공사 절차서의 점검 항목을 참고합니다.'}],site:[]}]}
 ];
@@ -1641,6 +1657,7 @@ function renderFlow(){
     var ck=flowStore('chk'),pg=flowProg(A,T);
     h+='<div class="fl-pbar"><span style="width:'+(pg.m?Math.round(100*pg.n/pg.m):0)+'%"></span></div><div class="mini">✔ '+pg.n+' / '+pg.m+' 확인 · 현장: <b>'+esc(flowProj())+'</b> (체크하면 날짜가 남아요)</div>';
     h+='<ol class="fl-steps">'+T.steps.map(function(s,i){return '<li><span class="fl-n">'+(i+1)+'</span><div><div class="fl-st"><b>'+esc(s.t)+'</b>'+ckBox(A.id+'/'+T.id+'/s'+i,ck)+'</div>'+(s.d?'<div class="mini">'+esc(s.d)+'</div>':'')+(s.doc?'<div class="mini fl-doc">📄 '+esc(s.doc)+'</div>':'')+flowRefs(s.r)+(s.app?'<div class="chips">'+s.app.map(flowAppBtn).join('')+'</div>':'')+'</div></li>'}).join('')+'</ol>';
+    if(T.edu&&T.edu.length)h+='<div class="fl-tool"><h3>📘 학교시설사업 자료</h3><div class="mini">학교건축 표준업무매뉴얼(2025)·단계별 관계법령(2023)에서 이 업무에 해당하는 부분</div><div class="chips">'+T.edu.map(eduChip).join('')+'</div></div>';
     if(T.site&&T.site.length)h+='<div class="ssite"><b>🏗️ 감독 체크</b><div class="fl-sitel">'+T.site.map(function(x,i){return '<div class="fl-st"><span>'+esc(x)+'</span>'+ckBox(A.id+'/'+T.id+'/c'+i,ck)+'</div>'}).join('')+'</div></div>';
     if(T.tool)T.tool.forEach(function(k){h+=measHtml(k)});
     var memo=flowStore('memo')[A.id+'/'+T.id]||'';
@@ -1658,7 +1675,7 @@ function renderFlow(){
     bindMeas(box);
   }else{
     var nT=0,nS=0;FLOW.forEach(function(A){nT+=A.tasks.length;A.tasks.forEach(function(T){nS+=T.steps.length})});
-    h+='<div class="card fl-top"><h2 class="fl-title"><span>전기공사 업무 흐름지도</span></h2><div class="mini">설계부터 발주·착공·시공 감독·준공·유지관리까지, 단계별로 할 일과 근거(KEC·법령·KDS/KCS·공사 절차서 사진)를 찾아보세요. 업무 카드를 누르면 세부 흐름으로 이동합니다.</div>'+
+    h+='<div class="card fl-top"><h2 class="fl-title"><span>전기공사 업무 흐름지도</span></h2><div class="mini">학교시설사업 기획부터 설계·발주·착공·시공 감독·준공·유지관리까지, 단계별로 할 일과 근거(KEC·법령·KDS/KCS·공사 절차서 사진)를 찾아보세요. 업무 카드를 누르면 세부 흐름으로 이동합니다.</div>'+
       '<div class="fl-stats"><span>'+FLOW.length+'개 단계</span><span>'+nT+'개 업무</span><span>'+nS+'개 세부 흐름</span></div>'+
       (function(){var tn=0,tm=0;FLOW.forEach(function(A){A.tasks.forEach(function(T){var g=flowProg(A,T);tn+=g.n;tm+=g.m})});var ps=flowProjs();if(ps.indexOf(flowProj())<0)ps.unshift(flowProj());return '<div class="fl-proj"><label class="mini">현장(공사)</label><select id="flProj">'+ps.map(function(x){return '<option'+(x===flowProj()?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'<option value="__new">+ 새 현장 추가</option></select><span class="mini">체크 '+tn+' / '+tm+'</span></div><div class="fl-pbar"><span style="width:'+(tm?Math.round(100*tn/tm):0)+'%"></span></div>'})()+
       '<input type="search" id="flQ" class="fl-q" placeholder="🔎 업무·단계 검색 (예: 사용전검사, 접지, 시공계획서)" value="'+esc(q)+'"></div>';
@@ -1670,7 +1687,7 @@ function renderFlow(){
       h+='<div class="fl-road">'+FLOW.map(function(A,i){return '<a href="#fl-'+A.id+'" style="--c:'+A.c+'">'+A.no+' '+esc(A.short||A.t)+'</a>'}).join('<span>›</span>')+'</div>';
       h+=FLOW.map(function(A){return '<section class="fl-area" id="fl-'+A.id+'" style="--c:'+A.c+'"><div class="fl-ah"><div><div class="fl-lab">STEP '+A.no+'</div><h3>'+esc(A.t)+'</h3></div><span class="fl-badge">'+A.tasks.length+'개 업무</span></div><div class="mini fl-ad">'+esc(A.d)+'</div>'+
         A.tasks.map(function(T){var pg=flowProg(A,T);return '<button type="button" class="fl-task" data-fa="'+A.id+'" data-ft="'+T.id+'"><div><b>'+esc(T.t)+'</b><div class="mini">'+T.steps.length+'개 세부 흐름'+(T.pr&&T.pr.length?' · 📷 사진 '+T.pr.length:'')+(T.tool?' · 📏 측정 기록':'')+(pg.n?' · <span class="fl-done">✔ '+pg.n+'/'+pg.m+'</span>':'')+'</div></div><span class="fl-arr">→</span></button>'}).join('')+'</section>'}).join('');
-      h+='<div class="mini" style="margin:10px 4px">근거: KEC(2026.1.5 시행), 전기공사업법·전력기술관리법·전기안전관리법, 전력시설물 공사감리업무 수행지침, KDS·KCS 32, 서울시 (전기) 공사 절차서(2026.9), 2026 전기부문 표준품셈. 실제 업무는 발주기관 지침과 계약 문서를 우선합니다.</div>';
+      h+='<div class="mini" style="margin:10px 4px">근거: 학교건축 표준업무매뉴얼(2025)·교육시설 사업 단계별 관계법령(2023), KEC(2026.1.5 시행), 전기공사업법·전력기술관리법·전기안전관리법, 전력시설물 공사감리업무 수행지침, KDS·KCS 32, 서울시 (전기) 공사 절차서(2026.9), 2026 전기부문 표준품셈. 실제 업무는 발주기관 지침과 계약 문서를 우선합니다.</div>';
     }
     box.innerHTML=h;
     var pj=$('flProj');if(pj)pj.addEventListener('change',function(){var v=pj.value;if(v==='__new'){v=(prompt('새 현장(공사) 이름','')||'').trim();if(!v){renderFlow();return}}var ps=flowProjs();if(ps.indexOf(v)<0){ps.push(v);try{localStorage.setItem('ed-flowprojs',JSON.stringify(ps))}catch(e){}}try{localStorage.setItem('ed-flowproj',v)}catch(e){}renderFlow()});
@@ -1683,6 +1700,8 @@ function renderFlow(){
   if(!KEC&&!S.flowKL){S.flowKL=1;loadKEC().then(function(){if(S.tab==='flow')renderFlow()}).catch(function(){})}
 }
 /* ---------- 흐름지도 ↔ 앱 기능 연결, 공사감독 체크리스트, 측정 기록 ---------- */
+function eduChip(r){var nm={man:'매뉴얼',rel:'관계법령',bid:'발주'},p=r.split(':'),i=KEC&&KEC.idx?KEC.idx[r]:null,t=i!=null?KEC.c[i].t.replace(/^.* — /,''):'';return '<button type="button" class="chip" data-kec="'+esc(r)+'">📘 '+esc((nm[p[1]]||p[1])+' '+p.slice(2).join(':')+(t?' '+t:''))+'</button>'}
+var STUDY_EDU={light:['L:man:2.2.4 라','L:man:3.2.7 다'],outlet:['L:man:2.2.4 마'],panel:['L:man:2.2.4 다','L:man:3.2.7 가'],feeder:['L:man:2.2.4 다','L:man:3.2.7 나'],tray:['L:man:3.2.7 나'],sub:['L:man:2.2.4 가','L:man:3.2.7 가'],ltn:['L:man:3.2.7 사','L:man:3.2.7 아','L:rel:18'],pv:['L:man:2.2.4 바','L:rel:25'],gen:['L:man:3.2.7 마'],fire:['L:man:2.2.6','L:man:3.2.8 나'],exit:['L:man:3.2.8 나'],seis:['L:man:3.2.7 가'],cost:['L:man:2.3.2','L:rel:27']};
 function flowChips(list){return '<div class="chips fl-links"><span class="mini">🗺️ 업무 흐름지도:</span>'+list.map(function(x){var f=flowFind(x[0],x[1]);return f.T?'<button type="button" class="chip" data-flowgo="'+x[0]+'/'+x[1]+'">'+esc(x[2]||f.T.t)+'</button>':''}).join('')+'</div>'}
 var STUDY_FLOW={light:[['build','light'],['design','drw']],exit:[['build','weak']],outlet:[['build','light']],panel:[['build','panel']],feeder:[['design','sys'],['build','wire']],tray:[['build','pipe']],sub:[['build','power']],ltn:[['build','earth']],pv:[['design','sys']],seis:[['build','misc']],gen:[['build','power']],cost:[['design','boq']],fire:[['build','weak']]};
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-flowgo]');if(!b)return;e.preventDefault();var p=b.dataset.flowgo.split('/');flowGo(p[0],p[1])});
@@ -2182,15 +2201,15 @@ function loadKEC(){
     d.idx={};d.c.forEach(function(c,i){d.idx[c.n]=i;c.T=c.t.toLowerCase().replace(/\s+/g,'');c.L=c.b.toLowerCase().replace(/\s+/g,'')});
     /* 법령·기준(law-data.js): 못 불러와도 KEC 검색은 그대로 쓴다 */
     d.laws={d:[],got:''};
-    for(var si=0;si<3;si++){try{
-      var gv=['LAW_B64','KDS_B64','PUM_B64'][si],fn=['law-data.js','kds-data.js','pum-data.js'][si];
+    for(var si=0;si<4;si++){try{
+      var gv=['LAW_B64','KDS_B64','PUM_B64','EDU_B64'][si],fn=['law-data.js','kds-data.js','pum-data.js','edu-data.js'][si];
       if(!window[gv])await new Promise(function(ok){var s=document.createElement('script');s.src=fn;s.onload=ok;s.onerror=ok;document.head.appendChild(s)});
       if(!window[gv])continue;
       var lb=atob(window[gv].replace(/\s+/g,'')),lu=new Uint8Array(lb.length);for(var j=0;j<lb.length;j++)lu[j]=lb.charCodeAt(j);
       var LD=JSON.parse(await new Response(new Blob([lu]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
       if(si===0)d.laws.got=LD.got;
-      LD.d.forEach(function(doc){d.laws.d.push(doc);var kds=/^k[dc]s/.test(doc.k),pum=/^pum/.test(doc.k);doc.c.forEach(function(c){
-        var e={n:'L:'+doc.k+':'+c.n,t:c.t,b:c.b,img:c.img,law:doc.name,num:c.n,ef:doc.meta&&doc.meta.ef,kds:kds,pum:pum,adm:/고시|공고|훈령|예규/.test(doc.meta&&doc.meta.type||'')};
+      LD.d.forEach(function(doc){d.laws.d.push(doc);var kds=/^k[dc]s/.test(doc.k),pum=/^pum/.test(doc.k),edu=/^(man|rel|bid)$/.test(doc.k);doc.c.forEach(function(c){
+        var e={n:'L:'+doc.k+':'+c.n,t:c.t,b:c.b,img:c.img,pg:c.pg,edu:edu,law:doc.name,num:c.n,ef:doc.meta&&doc.meta.ef,kds:kds,pum:pum,adm:/고시|공고|훈령|예규/.test(doc.meta&&doc.meta.type||'')};
         e.T=(e.t+' '+e.law).toLowerCase().replace(/\s+/g,'');e.L=e.b.toLowerCase().replace(/\s+/g,'');
         d.idx[e.n]=d.c.length;d.c.push(e);
       })});
@@ -2263,7 +2282,7 @@ function kecDetail(n){
   if(i==null){out.innerHTML='<div class="card empty2">'+esc(n)+' 조항을 찾지 못했습니다.</div>';return}
   var c=KEC.c[i],terms=kecTerms(($('kecQ').value||'').trim()).filter(function(t){return !/^\d/.test(t)});
   var parent=c.n.indexOf('.')>0?c.n.replace(/\.\d+$/,''):null,kids=KEC.c.filter(function(x){return x.n.indexOf(c.n+'.')===0&&x.n.split('.').length===c.n.split('.').length+1});
-  var src=c.img?'서울특별시 발간 — 작업 사진 '+c.img.length+'쪽(아래)':c.pum?'제공받은 PDF에서 추출(표·그림은 원문 확인)':c.kds?'국가건설기준 '+esc(c.ef||'')+' · <a href="https://www.kcsc.re.kr" target="_blank" rel="noopener">국가건설기준센터</a>':c.law?'시행 '+kdate(c.ef)+' · <a href="https://www.law.go.kr/'+(c.adm?'행정규칙':'법령')+'/'+encodeURIComponent(c.law)+'" target="_blank" rel="noopener">국가법령정보센터에서 보기</a>':'원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)';
+  var src=c.edu?'교육부·한국교육시설안전원 자료(제공받은 PDF·hwp에서 추출'+(c.pg?', 원문 '+c.pg+'쪽':'')+') — 표·그림은 원문 확인':c.img?'서울특별시 발간 — 작업 사진 '+c.img.length+'쪽(아래)':c.pum?'제공받은 PDF에서 추출(표·그림은 원문 확인)':c.kds?'국가건설기준 '+esc(c.ef||'')+' · <a href="https://www.kcsc.re.kr" target="_blank" rel="noopener">국가건설기준센터</a>':c.law?'시행 '+kdate(c.ef)+' · <a href="https://www.law.go.kr/'+(c.adm?'행정규칙':'법령')+'/'+encodeURIComponent(c.law)+'" target="_blank" rel="noopener">국가법령정보센터에서 보기</a>':'원문 '+(c.p||'-')+'쪽 (PDF '+c.q+'쪽)';
   var h='<div class="card"><div class="ch"><span class="no">'+esc(c.law?c.num:'KEC '+c.n)+'</span><b style="font-size:17px">'+esc(c.t)+'</b><span class="mini">'+(c.law?esc(c.law)+' · ':'')+src+'</span></div>'+
     '<div class="chips" style="margin:10px 0">'+(($('kecQ').value||'').trim()?'<button type="button" class="chip" id="kBack">← 검색 결과</button>':'')+
     (i>0?'<button type="button" class="chip" data-k2="'+esc(KEC.c[i-1].n)+'">◀ '+esc(kno(KEC.c[i-1]))+'</button>':'')+
@@ -3149,7 +3168,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.8.0';
+var APP_VERSION='1.9.0';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
