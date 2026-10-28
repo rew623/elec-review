@@ -2277,6 +2277,13 @@ async function runLegend(L,pn){
         var kept=hits.filter(function(h){return letters.some(function(t){return Math.hypot(t.x+t.w/2-h.x,t.y-t.z*0.35-h.y)<=rad})});
         if(kept.length){hits=kept;lfilter=true}
       }
+      /* 선 하나 모양은 배선과 길이가 같으면 헷갈린다 → 대부분의 등기구 선과 굵기가 다른 것(배선 굵기)은 뺀다 */
+      if(simple&&hits.length>=5&&g){
+        var hl=hits.map(function(h){var m=S.D.filter(function(q){return q.p.length===4&&Math.hypot(q.cx-h.x,q.cy-h.y)<0.4&&Math.abs(Math.max(q.w,q.h)-g.tw)<0.3*g.tw})[0];return m?m.lw:null});
+        var lc={},lb=null,ln=0;hl.forEach(function(w){if(w==null)return;var kk=w.toFixed(2);lc[kk]=(lc[kk]||0)+1;if(lc[kk]>ln){ln=lc[kk];lb=w}});
+        if(lb&&ln>=0.7*hits.length){var h2=hits.filter(function(h,i){return hl[i]==null||Math.abs(hl[i]-lb)<=0.08*lb});if(h2.length<hits.length){hits=h2;lfilter=true}}
+        var hd=[];hits.forEach(function(h){if(!hd.some(function(m){return Math.hypot(m.x-h.x,m.y-h.y)<0.2*g.tw}))hd.push(h)});hits=hd;
+      }
       var grp={id:Date.now()+Math.random(),auto:true,name:name,type:it.type,desc:it.desc,qty:it.qty,status:status,simple:simple,lfilter:lfilter,
         color:AUTO_COL[ci++%AUTO_COL.length],expected:it.qty==null?'':String(it.qty),
         tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:key,legend:li,circ:!!(sel.length&&findCircles(sel).length)};
@@ -2426,7 +2433,7 @@ function renderAutoPanel(){
     h+='<div class="atbl">';
     A.items.forEach(function(g){
       var n=count(g),act=S.active===g.id;
-      h+='<div class="arow'+(act?' act':'')+'" data-g="'+g.id+'"><span class="sw" style="background:'+g.color+'"></span><div class="an"><b>'+(g.bare?'기호 없는 등기구 ('+esc(g.type)+')':esc(g.type)+'형')+'</b> <span class="mini">'+esc(g.desc||'')+'</span>'+(g.note?'<div class="mini" style="color:#e67700">'+esc(g.note)+'</div>':'')+(g.simple&&g.status!=='none'?'<div class="mini">'+(g.lfilter?'선 하나 모양 — 옆에 스위치 소문자가 있는 것만 셈':'선 하나 모양이라 다른 선이 섞일 수 있음')+'</div>':'')+'</div>'+
+      h+='<div class="arow'+(act?' act':'')+'" data-g="'+g.id+'"><span class="sw" style="background:'+g.color+'"></span><div class="an"><b>'+(g.bare?'기호 없는 등기구 ('+esc(g.type)+')':esc(g.type)+'형')+'</b> <span class="mini">'+esc(g.desc||'')+'</span>'+(g.note?'<div class="mini" style="color:#e67700">'+esc(g.note)+'</div>':'')+(g.simple&&g.status!=='none'?'<div class="mini">'+(g.lfilter?'선 하나 모양 — 옆에 스위치 소문자가 있고 등기구 선 굵기인 것만 셈(배선 제외)':'선 하나 모양이라 다른 선이 섞일 수 있음')+'</div>':'')+'</div>'+
         '<div class="aq"><b>'+n+'</b><span class="mini">/ 표 '+(g.qty==null?'-':g.qty)+'</span></div>'+stLabel(g)+
         '<div class="ab"><button type="button" data-go="'+g.id+'"'+(S.focusOnly===g.id?' class="on"':'')+'>'+(S.focusOnly===g.id?'모두 보기':'보기')+'</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
     });
@@ -2511,7 +2518,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.5.8';
+var APP_VERSION='1.5.9';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
