@@ -2454,6 +2454,209 @@ function stLabel(g){
   if(g.status==='guess')return '<span class="badge warn">추정 · 확인 필요</span>';
   return d===0?'<span class="badge ok">일치</span>':'<span class="badge '+(Math.abs(d)<=2?'warn':'bad')+'">차이 '+(d>0?'+':'')+d+'</span>';
 }
+/* ===================== 산출서·집계표(xlsx) 비교 ===================== */
+/* xlsx = zip 안의 XML. 브라우저 기본 기능(DecompressionStream·DOMParser)으로 기기 안에서만 읽는다 */
+async function unzipEntries(buf){
+  var dv=new DataView(buf),u8=new Uint8Array(buf),e=-1;
+  for(var i=buf.byteLength-22;i>=Math.max(0,buf.byteLength-70000);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break}}
+  if(e<0)throw new Error('zip 아님');
+  var n=dv.getUint16(e+10,true),p=dv.getUint32(e+16,true),out={},td=new TextDecoder();
+  for(var k=0;k<n;k++){
+    var meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    var name=td.decode(u8.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;
+    out[name]={meth:meth,csz:csz,off:off};
+  }
+  return {get:async function(name){var f=out[name];if(!f)return null;
+    var lo=f.off,ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=u8.subarray(ds,ds+f.csz);
+    if(f.meth===0)return td.decode(raw);
+    var st=new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return await new Response(st).text()},names:Object.keys(out)};
+}
+function TN(el,n){return el.getElementsByTagNameNS('*',n)}
+async function readXlsx(buf){
+  var z=await unzipEntries(buf),P=new DOMParser();
+  function X(s){return s?P.parseFromString(s,'application/xml'):null}
+  var ss=[],sx=X(await z.get('xl/sharedStrings.xml'));
+  if(sx)Array.prototype.forEach.call(TN(sx,'si'),function(si){var t='';Array.prototype.forEach.call(TN(si,'t'),function(x){t+=x.textContent});ss.push(t)});
+  var wb=X(await z.get('xl/workbook.xml')),rel=X(await z.get('xl/_rels/workbook.xml.rels')),rm={};
+  if(rel)Array.prototype.forEach.call(TN(rel,'Relationship'),function(r){rm[r.getAttribute('Id')]=r.getAttribute('Target')});
+  var sheets=[];
+  var list=wb?Array.prototype.slice.call(TN(wb,'sheet')):[];
+  for(var i=0;i<list.length;i++){
+    var sh=list[i],rid=sh.getAttribute('r:id')||sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+    var tg=(rm[rid]||('worksheets/sheet'+(i+1)+'.xml')).replace(/^\/?xl\//,'').replace(/^\//,'');
+    var doc=X(await z.get('xl/'+tg));if(!doc)continue;
+    var rows=[];
+    Array.prototype.forEach.call(TN(doc,'row'),function(r){
+      var row=[];
+      Array.prototype.forEach.call(TN(r,'c'),function(c){
+        var ref=c.getAttribute('r')||'',m=ref.match(/^([A-Z]+)/),col=0;if(m)for(var j=0;j<m[1].length;j++)col=col*26+m[1].charCodeAt(j)-64;col--;
+        var t=c.getAttribute('t'),v=TN(c,'v')[0],val=null;
+        if(t==='s'&&v)val=ss[+v.textContent];
+        else if(t==='inlineStr'){var is=TN(c,'t')[0];val=is?is.textContent:''}
+        else if(v){val=t==='str'||t==='e'?v.textContent:parseFloat(v.textContent);if(typeof val==='number'&&isNaN(val))val=v.textContent}
+        if(col>=0)row[col]=val;
+      });
+      rows.push(row);
+    });
+    sheets.push({name:sh.getAttribute('name'),rows:rows});
+  }
+  return sheets;
+}
+function floorKey(s){
+  s=String(s||'').replace(/\s+/g,'');
+  var m;
+  if(/PIT|피트/i.test(s))return 'PIT';
+  if(/RF|옥탑|지붕|PH/i.test(s))return 'RF';
+  if((m=s.match(/(?:B|지하)(\d+)/i)))return 'B'+m[1];
+  if((m=s.match(/(\d+)(?:F|층)/i)))return m[1]+'F';
+  return null;
+}
+function floorName(k){return k==='PIT'?'PIT층':k==='RF'?'옥탑층':/^B/.test(k)?'지하'+k.slice(1)+'층':k?k.replace('F','층'):'?'}
+var FIX_RE=/조명기구\s*["“”']?\s*([A-Z]\d?)\s*["“”']?/;
+function parseBoq(sheets,fname){
+  var res={name:fname,floors:{},spec:{},kind:''};
+  function add(f,t,q){if(!f||!t||!(q>0))return;var F=res.floors[f]||(res.floors[f]={});F[t]=(F[t]||0)+q}
+  /* ① 집계표: 머리줄에 층 칸(1F·2F·PIT·RF… 또는 '1F 조명기구')이 있는 표 */
+  sheets.forEach(function(sh){
+    var hdr=null;
+    sh.rows.forEach(function(r){
+      if(!r)return;
+      var cells=r.map(function(x){return x==null?'':String(x)});
+      if(cells.some(function(x){return /품\s*명/.test(x)})){
+        var fc={};cells.forEach(function(x,i){var f=floorKey(x);if(f&&x.length<14){var light=/조명/.test(x);if(!fc[f]||light&&!fc[f].light)fc[f]={i:i,light:light}}});
+        hdr=Object.keys(fc).length?fc:null;return;
+      }
+      if(!hdr)return;
+      var nm=cells.filter(function(x){return FIX_RE.test(x)})[0];if(!nm)return;
+      var t=nm.match(FIX_RE)[1],ni=cells.indexOf(nm),sp=cells.slice(ni+1).filter(function(x){return /\d\s*W|LED/i.test(x)})[0];
+      if(sp&&!res.spec[t])res.spec[t]=sp.trim();
+      Object.keys(hdr).forEach(function(f){var v=r[hdr[f].i];if(typeof v==='number')add(f,t,v)});
+      res.kind='집계표';
+    });
+  });
+  if(Object.keys(res.floors).length)return res;
+  /* ② 산출서: 줄 끝에 '1F 조명기구' 같은 구분이 붙은 산출 줄 */
+  sheets.forEach(function(sh){
+    sh.rows.forEach(function(r){
+      if(!r)return;
+      var cells=r.map(function(x){return x==null?'':String(x)}),nm=cells.filter(function(x){return FIX_RE.test(x)})[0];if(!nm)return;
+      var lab=null,li=-1;for(var i=cells.length-1;i>=0;i--){if(/조명/.test(cells[i])&&floorKey(cells[i])){lab=cells[i];li=i;break}}
+      if(!lab)return;
+      var q=null;for(var j=li-1;j>=0;j--){if(typeof r[j]==='number'){q=r[j];break}}
+      var t=nm.match(FIX_RE)[1],sp=cells.filter(function(x){return /^LED\s*\d+\s*W$/i.test(x.trim())})[0];
+      if(sp&&!res.spec[t])res.spec[t]=sp.trim();
+      add(floorKey(lab),t,q);res.kind='산출서';
+    });
+  });
+  return res;
+}
+var BOQ=null;try{BOQ=JSON.parse(localStorage.getItem('ed-boq')||'null')}catch(e){}
+function boqSave(){try{localStorage.setItem('ed-boq',JSON.stringify(BOQ))}catch(e){}}
+async function loadBoqFile(f){
+  try{
+    var sheets=await readXlsx(await f.arrayBuffer()),b=parseBoq(sheets,f.name);
+    if(!Object.keys(b.floors).length){toast('이 파일에서 조명기구 "A"… 같은 줄을 층별로 찾지 못했어요. 공종별 집계표나 산출서(xlsx)를 넣어 주세요.',6000);return}
+    BOQ=b;boqSave();renderAutoPanel();
+    toast(b.kind+'에서 '+Object.keys(b.floors).map(floorName).join('·')+' 조명기구 수량을 읽었어요.',4000);
+  }catch(e){toast('xlsx를 읽지 못했어요: '+e.message,6000)}
+}
+/* 도면 쪽: 전등표가 있는 쪽마다 층·타입별 (표 수량, 자동 집계) 저장 */
+var LEGRES={};
+function legKey(){return 'ed-leg-'+scanKey()}
+function legLoad(){try{LEGRES=JSON.parse(localStorage.getItem(legKey())||'{}')||{}}catch(e){LEGRES={}}}
+function pageFloor(){
+  var t=(S.texts||[]).map(function(x){return x.s}).join(' ').replace(/\s+/g,' ');
+  var m=t.match(/(지하\s*\d+\s*층|\d+\s*층|옥탑층|PIT층|지붕층)[^"]{0,6}전등설비\s*평면도/);
+  return m?floorKey(m[1]):null;
+}
+function legStore(){
+  var A=S.auto;if(!A||A.mode!=='legend'||A.busy||!scanKey())return;
+  if(!LEGRES.__k||LEGRES.__k!==scanKey()){legLoad();LEGRES.__k=scanKey()}
+  var f=pageFloor();
+  LEGRES[S.pageNum]={floor:f,pn:S.pageName||'',items:A.items.map(function(g){return {type:g.type,desc:g.desc||'',qty:g.qty,n:count(g),bare:!!g.bare}})};
+  try{localStorage.setItem(legKey(),JSON.stringify(LEGRES))}catch(e){}
+}
+function boqQ(F,types){if(!F)return null;var s=0,any=false;types.forEach(function(t){if(F[t]!=null){s+=F[t];any=true}});return any?s:0}
+function wNum(s){var m=String(s||'').match(/(\d+(?:\.\d+)?)\s*W/i);return m?parseFloat(m[1]):null}
+function judge(r){
+  var b=r.boq,q=r.qty,n=r.n,out=[];
+  if(b==null)out.push(['산출서에 없음','bad']);
+  else if(q!=null&&q===b&&n===b)out.push(['일치','ok']);
+  else if(n===b&&q!==b&&q!=null)out.push(['도면 표 확인 — 자동 집계는 산출서와 같음','warn']);
+  else if(q===b&&n!==b)out.push(['자동 집계 확인(‘보기’로 보정)','warn']);
+  else if(q==null&&n===b)out.push(['일치(도면 표 없음)','ok']);
+  else out.push(['셋 다 다름 — 직접 확인','bad']);
+  if(r.wd!=null&&r.wb!=null&&r.wd!==r.wb&&(r.boq||r.qty))out.push(['규격 다름: 도면 '+r.wd+'W / 산출 '+r.wb+'W','bad']);
+  return out;
+}
+function boqRows(pr){
+  var F=BOQ&&pr.floor?BOQ.floors[pr.floor]:null,rows=[],seen={},cov={};
+  pr.items.forEach(function(it){if(it.bare)it.type.split('·').forEach(function(t){cov[t]=1})});
+  pr.items.forEach(function(it){
+    var types=it.type.split('·');types.forEach(function(t){seen[t]=1});
+    if(!it.bare&&it.qty===0&&it.n===0&&!boqQ(F,types))return;
+    var r={type:(it.bare?'기호 없음(':'')+it.type+(it.bare?')':''),qty:it.bare?null:it.qty,n:it.n,boq:boqQ(F,types),wd:it.bare?null:wNum(it.desc),wb:types.length===1&&BOQ?wNum(BOQ.spec[types[0]]):null};
+    if(it.bare){var tq=pr.items.filter(function(o){return !o.bare&&types.indexOf(o.type)>=0}).reduce(function(a,o){return a+(o.qty||0)},0);r.qty=tq||null}
+    if(!it.bare&&types.every(function(t){return cov[t]})){r.n=null;r.j=r.boq==null?[['산출서에 없음','bad']]:r.qty===r.boq?[['도면 표 = 산출 (자동 집계는 아래 ‘기호 없음’ 줄에 합산)','ok']]:[['도면 표 확인 — 산출서와 다름','warn']];
+      if(r.wd!=null&&r.wb!=null&&r.wd!==r.wb&&(r.boq||r.qty))r.j.push(['규격 다름: 도면 '+r.wd+'W / 산출 '+r.wb+'W','bad'])}
+    else r.j=judge(r);
+    rows.push(r);
+  });
+  if(F)Object.keys(F).forEach(function(t){if(!seen[t]&&F[t]){var r={type:t,qty:null,n:null,boq:F[t]};r.j=[['도면 전등표에 없는 타입','bad']];rows.push(r)}});
+  return rows;
+}
+function boqTable(rows){
+  var c={ok:'#2b8a3e',warn:'#e67700',bad:'#c92a2a'};
+  return '<table class="sum"><tr><th>타입</th><th class="n">도면 표</th><th class="n">자동</th><th class="n">산출</th><th>판정</th></tr>'+rows.map(function(r){
+    return '<tr><td><b>'+esc(r.type)+'</b></td><td class="n">'+(r.qty==null?'-':r.qty)+'</td><td class="n">'+(r.n==null?'-':r.n)+'</td><td class="n">'+(r.boq==null?'-':r.boq)+'</td><td>'+r.j.map(function(j){return '<span class="mini" style="color:'+c[j[1]]+'">'+esc(j[0])+'</span>'}).join('<br>')+'</td></tr>'}).join('')+'</table>';
+}
+function boqHtml(){
+  var h='<div style="margin-top:14px;border-top:1px solid var(--line,#ddd);padding-top:10px"><h2 style="margin:0 0 6px">📑 산출서·내역 비교</h2>';
+  var f=pageFloor();
+  if(!BOQ){
+    h+='<div class="mini">공종별 집계표나 수량산출서(xlsx)를 불러오면 이 층의 <b>도면 표 · 자동 집계 · 산출 수량</b>을 타입별로 나란히 비교합니다. 파일은 이 기기 안에서만 읽고 어디로도 보내지 않아요.</div>';
+  }else{
+    h+='<div class="mini">'+esc(BOQ.name)+' ('+esc(BOQ.kind)+') · 층: '+Object.keys(BOQ.floors).map(floorName).join(', ')+'</div>';
+    if(!f)h+='<div class="mini" style="color:#e67700">이 쪽 도면 제목에서 층(1층·2층·옥탑층…)을 못 읽었어요.</div>';
+    else{
+      var pr={floor:f,items:S.auto.items.map(function(g){return {type:g.type,desc:g.desc||'',qty:g.qty,n:count(g),bare:!!g.bare}})};
+      h+='<div class="mini" style="margin:4px 0"><b>'+floorName(f)+'</b> 비교</div>'+boqTable(boqRows(pr));
+    }
+  }
+  h+='<div class="g3" style="margin-top:8px"><label class="btn" style="text-align:center;cursor:pointer">'+(BOQ?'다른 파일':'산출서 불러오기')+'<input type="file" id="boqFile" accept=".xlsx" hidden></label>'+(BOQ?'<button type="button" id="boqAll">전체 층 비교</button><button type="button" id="boqCopy">비교표 복사</button>':'')+'</div>';
+  h+='<details class="mini" style="margin-top:8px"><summary>도면·내역 비교 순서(권장)</summary><ol style="padding-left:18px;margin:6px 0">'+
+    '<li>도면 PDF를 올리고 전등 평면도 쪽마다 자동 집계를 봅니다.</li>'+
+    '<li>타입별 ‘보기’로 잘못 잡은 것을 ‘보정’으로 빼고 더해 <b>도면 수량을 먼저 확정</b>합니다(전등표와 다르면 전등표 오타일 수도 있음).</li>'+
+    '<li>산출서·집계표를 불러와 층·타입별로 비교합니다. 판정: <b>도면 표 확인</b>=자동 집계와 산출서는 같고 도면 표만 다름(표 오타 가능성), <b>자동 집계 확인</b>=표와 산출서는 같고 인식이 틀림, <b>셋 다 다름</b>=직접 세어 확인.</li>'+
+    '<li>규격(W)도 도면 전등표와 내역 규격이 같은지 봅니다(관급자재 발주 전 확인).</li>'+
+    '<li>모든 층을 본 뒤 ‘전체 층 비교’ → ‘비교표 복사’로 엑셀에 붙여 검토 의견서를 만듭니다.</li></ol></details>';
+  return h+'<div id="boqAllBox"></div></div>';
+}
+function boqAllRows(){
+  legLoad();var out=[],floors={};
+  Object.keys(LEGRES).forEach(function(p){if(p==='__k')return;var pr=LEGRES[p];if(pr.floor)floors[pr.floor]=floors[pr.floor]||{p:p,pr:pr}});
+  if(BOQ)Object.keys(BOQ.floors).forEach(function(f){floors[f]=floors[f]||null});
+  Object.keys(floors).sort().forEach(function(f){
+    var x=floors[f];
+    if(!x){Object.keys(BOQ.floors[f]).forEach(function(t){out.push({floor:f,pn:'',type:t,qty:null,n:null,boq:BOQ.floors[f][t],j:[['이 층 전등 도면을 아직 안 봤거나 전등표가 없음','warn']]})});return}
+    boqRows(x.pr).forEach(function(r){r.floor=f;r.pn=x.pr.pn;out.push(r)});
+  });
+  return out;
+}
+function bindBoq(box){
+  var fi=box.querySelector('#boqFile');if(fi)fi.addEventListener('change',function(){if(fi.files[0])loadBoqFile(fi.files[0])});
+  var ab=box.querySelector('#boqAll');if(ab)ab.addEventListener('click',function(){
+    var rows=boqAllRows(),bx=$('boqAllBox'),by={};
+    rows.forEach(function(r){(by[r.floor]||(by[r.floor]=[])).push(r)});
+    bx.innerHTML=Object.keys(by).map(function(f){return '<div class="mini" style="margin:10px 0 4px"><b>'+floorName(f)+'</b> '+esc(by[f][0].pn||'')+'</div>'+boqTable(by[f])}).join('')||'<div class="mini">아직 집계한 전등 평면도가 없어요. 각 층 전등 평면도 쪽을 한 번씩 열어 주세요.</div>';
+  });
+  var cb=box.querySelector('#boqCopy');if(cb)cb.addEventListener('click',function(){
+    var rows=[['층','도면','타입','도면 표','자동 집계','산출 수량','판정']];
+    boqAllRows().forEach(function(r){rows.push([floorName(r.floor),r.pn||'',r.type,r.qty==null?'':r.qty,r.n==null?'':r.n,r.boq==null?'':r.boq,r.j.map(function(j){return j[0]}).join(' / ')])});
+    copyText(rows.map(function(r){return r.join('\t')}).join('\n'));
+  });
+}
 function renderAutoPanel(){
   var box=$('autoPanel');if(!box)return;var A=S.auto,h='';
   var manualP=$('manualPanels');if(manualP)manualP.hidden=!!(A&&A.mode==='legend');
@@ -2469,13 +2672,14 @@ function renderAutoPanel(){
         '<div class="ab"><button type="button" data-go="'+g.id+'"'+(S.focusOnly===g.id?' class="on"':'')+'>'+(S.focusOnly===g.id?'모두 보기':'보기')+'</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
     });
     h+='</div><div class="mini" style="margin-top:8px">‘보기’를 누르면 그 타입으로 인식한 것만 도면에 남습니다(다시 누르면 모두). 틀린 동그라미는 ‘보정’ 모드에서 눌러 빼거나 더할 수 있어요. ‘지정’은 도면에서 그 심벌 하나를 네모로 감싸면 그 모양으로 다시 셉니다.</div>'+
-      '<div class="g3" style="margin-top:8px"><button type="button" id="aCopy">집계표 복사</button><button type="button" id="aAll">모두 보기</button></div>';
+      '<div class="g3" style="margin-top:8px"><button type="button" id="aCopy">집계표 복사</button><button type="button" id="aAll">모두 보기</button></div>'+(A.busy?'':boqHtml());
     box.innerHTML=h;
     box.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var id=+b.dataset.go;
       if(S.focusOnly===id){S.focusOnly=null;S.active=null;S.groups.forEach(function(g){g.show=true});fitView();renderAutoPanel();draw();return}
       S.focusOnly=id;S.active=id;S.groups.forEach(function(g){g.show=g.id===id});var g=S.groups.filter(function(x){return x.id===id})[0];var pts=g.hits.filter(function(x){return !x.off});if(pts.length)zoomToPts(pts);else fitView();renderAutoPanel();draw();toast(g.type+'형으로 인식한 것만 표시합니다('+count(g)+'개). 다시 누르면 모두 보기.',3500)})});
     box.querySelectorAll('[data-as]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();S.assign=+b.dataset.as;var g=S.groups.filter(function(x){return x.id===S.assign})[0];setMode('sel');toast('도면을 확대한 뒤, '+g.type+'형 심벌 하나를 네모로 감싸 주세요.',5000)})});
     $('aAll').addEventListener('click',function(){S.groups.forEach(function(g){g.show=true});S.active=null;S.focusOnly=null;fitView();renderAutoPanel();draw()});
+    if(!A.busy){bindBoq(box);legStore()}
     $('aCopy').addEventListener('click',function(){var rows=[['도면','타입','설명','찾은 수','표 수량','차이','상태']];A.items.forEach(function(g){var n=count(g);rows.push([S.pageName||S.pageNum,g.type,g.desc,n,g.qty==null?'':g.qty,g.qty==null?'':n-g.qty,{auto:'자동',manual:'지정',guess:'추정',none:'못 찾음'}[g.status]])});copyText(rows.map(function(r){return r.join('\t')}).join('\n'))});
     return;
   }
@@ -2549,7 +2753,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.5.10';
+var APP_VERSION='1.6.0';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
@@ -2602,7 +2806,7 @@ function checkLib(n){
   setStatus('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 페이지를 새로 열어 주세요.',true);
 }
 checkLib(10);
-window.__app={findCircles:findCircles,S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
+window.__app={readXlsx:readXlsx,parseBoq:parseBoq,findCircles:findCircles,S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
 })();
 </script>
 </body>
