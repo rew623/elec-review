@@ -698,6 +698,7 @@ function paint(){
       ctx.save();ctx.translate(T.x,T.y);ctx.rotate(T.r);ctx.font=T.z+'px sans-serif';ctx.fillText(T.s,0,0);ctx.restore();
     }
   }
+  paintWire(k);
   /* 표시 */
   S.groups.forEach(function(g){
     if(!g.show)return;
@@ -2217,7 +2218,7 @@ var AUTO_COL=['#e8590c','#1c7ed6','#2f9e44','#c2255c','#7048e8','#0b7285','#e677
 var SIZE_COL=[[240,'#c92a2a'],[150,'#e8590c'],[120,'#f08c00'],[95,'#e67700'],[70,'#5c940d'],[50,'#2b8a3e'],[35,'#0b7285'],[25,'#1971c2'],[16,'#3b5bdb'],[10,'#7048e8'],[6,'#ae3ec9'],[4,'#c2255c'],[0,'#868e96']];
 function sizeColor(sz){for(var i=0;i<SIZE_COL.length;i++)if(sz>=SIZE_COL[i][0])return SIZE_COL[i][1];return '#868e96'}
 S.auto={mode:null};S.tplCache={};S.kCache={};
-function autoReset(){S.focusOnly=null;S.auto={mode:null};S.groups=S.groups.filter(function(g){return !g.auto});S.assign=null}
+function autoReset(){S.wire=null;S.wireOnly=null;S.focusOnly=null;S.auto={mode:null};S.groups=S.groups.filter(function(g){return !g.auto});S.assign=null}
 function sleep0(){return new Promise(function(r){setTimeout(r,0)})}
 async function autoPage(){
   var pn=S.pageNum;autoReset();renderAutoPanel();
@@ -2342,6 +2343,7 @@ async function runLegend(L,pn){
       S.groups.push(bg);S.auto.items.push(bg);
     });
   }
+  try{S.wire=wireAnalyze()}catch(e){S.wire=null}
   S.auto.busy=false;setStatus('자동 집계 완료 · '+(S.pageName||S.pageNum+'쪽'));renderAutoPanel();renderSum();draw();
 }
 /* 틀 안 선이 모두 동그라미 조각이면(가운데 아주 작은 점은 허용) 동그라미만 있는 심벌 */
@@ -2484,6 +2486,92 @@ function stLabel(g){
   var d=n-g.qty;
   if(g.status==='guess')return '<span class="badge warn">추정 · 확인 필요</span>';
   return d===0?'<span class="badge ok">일치</span>':'<span class="badge '+(Math.abs(d)<=2?'warn':'bad')+'">차이 '+(d>0?'+':'')+d+'</span>';
+}
+/* ===================== 배선 가닥수(선 위 빗금) ===================== */
+/* 빗금 개수 = 전선 가닥수(빗금 없음 = 2가닥). 빗금이 있는 배선 구간을 꺾인 곳(이음점 2개)까지 이어서 같은 가닥수로 본다 */
+var WIRE_COL={2:'#868e96',3:'#e8590c',4:'#1c7ed6',5:'#ae3ec9',6:'#2b8a3e',7:'#c92a2a',8:'#0b7285'};
+function wireAnalyze(){
+  var L=S.D.filter(function(s){return s.p.length===4}),lws={};
+  L.forEach(function(s){var len=Math.hypot(s.w,s.h);if(len>3&&s.lw>0.5)lws[s.lw.toFixed(2)]=(lws[s.lw.toFixed(2)]||0)+len});
+  var wl=0,wn=0;for(var k in lws)if(lws[k]>wn){wn=lws[k];wl=parseFloat(k)}
+  if(!wl)return null;
+  var W=L.filter(function(s){return Math.abs(s.lw-wl)<0.1*wl&&Math.hypot(s.w,s.h)>0.5}),G={};
+  W.forEach(function(s){for(var x=Math.floor(s.bx0/4);x<=Math.floor(s.bx1/4);x++)for(var y=Math.floor(s.by0/4);y<=Math.floor(s.by1/4);y++)(G[x+','+y]||(G[x+','+y]=[])).push(s)});
+  function onWire(px,py){var l=G[Math.floor(px/4)+','+Math.floor(py/4)]||[];
+    for(var i=0;i<l.length;i++){var s=l[i],ax=s.p[0],ay=s.p[1],dx=s.p[2]-ax,dy=s.p[3]-ay,L2=dx*dx+dy*dy,t=((px-ax)*dx+(py-ay)*dy)/L2;if(t<0.03||t>0.97)continue;if(Math.hypot(px-ax-t*dx,py-ay-t*dy)<0.35)return s}return null}
+  var ex=(S.auto&&S.auto.L||[]).map(function(l){return l.bbox}),ticks=[];
+  L.forEach(function(s){
+    if(s.lw>=wl*0.95)return;
+    var dx=s.p[2]-s.p[0],dy=s.p[3]-s.p[1],len=Math.hypot(dx,dy);
+    if(len<0.5||len>6*wl||Math.abs(Math.abs(dx)-Math.abs(dy))/len>0.3)return;
+    var w=onWire(s.cx,s.cy);if(!w)return;
+    if(ticks.some(function(t){return Math.hypot(t.x-s.cx,t.y-s.cy)<0.2}))return;
+    ticks.push({x:s.cx,y:s.cy,w:w,len:len});
+  });
+  var used={},marks=[];
+  ticks.forEach(function(t,i){
+    if(used[i])return;var c=[t],grow=true;used[i]=1;
+    while(grow){grow=false;ticks.forEach(function(u,j){if(used[j]||u.w!==t.w)return;if(c.some(function(v){return Math.hypot(v.x-u.x,v.y-u.y)<1.2*t.len})){c.push(u);used[j]=1;grow=true}})}
+    var m={x:0,y:0,n:c.length,w:t.w};c.forEach(function(v){m.x+=v.x/c.length;m.y+=v.y/c.length});
+    if(m.n>=3&&!ex.some(function(b){return m.x>b[0]&&m.x<b[2]&&m.y>b[1]&&m.y<b[3]}))marks.push(m);
+  });
+  /* 배선만 남기기: 끝점·T자 이음으로 묶은 선 무리 중 등기구나 빗금에 닿는 무리만(표·글상자 테두리, 경계선 등 제외) */
+  var par=W.map(function(_,i){return i});function fd(i){while(par[i]!==i){par[i]=par[par[i]];i=par[i]}return i}function un(a,b){a=fd(a);b=fd(b);if(a!==b)par[a]=b}
+  W.forEach(function(s,i){s._i=i});
+  var ek={};W.forEach(function(s){[[s.p[0],s.p[1]],[s.p[2],s.p[3]]].forEach(function(e){var kk=Math.round(e[0]/0.5)+','+Math.round(e[1]/0.5);if(ek[kk]!=null)un(ek[kk],s._i);else ek[kk]=s._i;var o=onWire(e[0],e[1]);if(o)un(o._i,s._i)})});
+  var good={};
+  marks.forEach(function(m){good[fd(m.w._i)]=1});
+  var hp=[];(S.auto&&S.auto.items||[]).forEach(function(g){g.hits.forEach(function(h){if(!h.off)hp.push({x:h.x,y:h.y,r:Math.max(g.tw||3,g.th||3)*0.6+1})})});
+  W.forEach(function(s){var c=fd(s._i);if(good[c])return;if(hp.some(function(h){return Math.hypot(h.x-s.p[0],h.y-s.p[1])<h.r||Math.hypot(h.x-s.p[2],h.y-s.p[3])<h.r||Math.hypot(h.x-s.cx,h.y-s.cy)<h.r}))good[c]=1});
+  W=W.filter(function(s){return good[fd(s._i)]&&Math.hypot(s.w,s.h)<0.3*Math.max(S.pw,S.ph)});
+  /* 이음점: 끝점이 겹치는 배선 수가 2개면 꺾인 곳 → 가닥수를 이어 준다 */
+  var nd={};function key(x,y){return Math.round(x/0.4)+','+Math.round(y/0.4)}
+  W.forEach(function(s){[key(s.p[0],s.p[1]),key(s.p[2],s.p[3])].forEach(function(kk){(nd[kk]||(nd[kk]=[])).push(s)})});
+  W.forEach(function(s){s._n=0});
+  marks.forEach(function(m){
+    if(m.w._n>=m.n)return;m.w._n=m.n;var q=[m.w];
+    while(q.length){var s=q.pop();[key(s.p[0],s.p[1]),key(s.p[2],s.p[3])].forEach(function(kk){var l=nd[kk];if(!l||l.length!==2)return;l.forEach(function(o){if(o!==s&&o._n<m.n&&!marks.some(function(mm){return mm.w===o})){o._n=m.n;q.push(o)}})})}
+  });
+  /* 축척: 'A3 : 1/400' 같은 글자(용지가 A3이면 A3 축척) */
+  var tx=S.texts.map(function(t){return t.s}).join(' '),sc=null,mm;
+  var a3=Math.abs(Math.max(S.pw,S.ph)-1190.55)<6;
+  if(a3&&(mm=tx.match(/A3\s*[:：]\s*1\s*\/\s*(\d{2,4})/)))sc=+mm[1];
+  else if((mm=tx.match(/A3\s*[:：]\s*(\d{2,4})\s*\)/))&&a3)sc=+mm[1];
+  else if((mm=tx.match(/1\s*\/\s*(\d{2,4})/)))sc=+mm[1];
+  var spec={};S.texts.forEach(function(t){var m=t.s.replace(/\s+/g,' ').match(/(HFIX|HF-?CO|F-?CV|CV)\s*([\d.]+)\s*(?:㎟|mm2|sq)?\s*[Xx×]\s*(\d+)\s*\(?\s*(CD|HI|PE|ST|E)?\s*(\d+)\s*C?/i);if(m&&!spec[m[3]])spec[m[3]]=m[1].toUpperCase()+' '+m[2]+'㎟×'+m[3]+(m[5]?' ('+(m[4]||'')+m[5]+'C)':'')});
+  var by={};
+  W.forEach(function(s){if(ex.some(function(b){return s.cx>b[0]&&s.cx<b[2]&&s.cy>b[1]&&s.cy<b[3]}))return;var n=s._n||2,len=Math.hypot(s.p[2]-s.p[0],s.p[3]-s.p[1]);var o=by[n]||(by[n]={n:n,marks:0,len:0});o.len+=len});
+  marks.forEach(function(m){var o=by[m.n]||(by[m.n]={n:m.n,marks:0,len:0});o.marks++});
+  return {W:W,marks:marks,by:by,scale:sc,spec:spec,mpp:sc?0.3528*sc/1000:null};
+}
+function wireHtml(){
+  var A=S.wire;if(!A)return '';
+  var ns=Object.keys(A.by).map(Number).sort(function(a,b){return a-b});
+  var h='<div style="margin-top:14px;border-top:1px solid var(--line,#ddd);padding-top:10px"><h2 style="margin:0 0 6px">🧵 전선 가닥수(배선 위 빗금)</h2>';
+  h+='<div class="mini">빗금 개수 = 가닥수, 빗금 없는 배선 = 2가닥. 빗금이 있는 구간은 꺾인 곳까지 같은 가닥수로 이어 봄. '+(A.scale?'축척 1/'+A.scale+' 기준 길이(대략).':'축척을 못 읽어 길이는 도면 단위.')+'</div>';
+  h+='<table class="sum"><tr><th>가닥</th><th class="n">빗금</th><th class="n">배관 m</th><th class="n">전선 m</th><th>규격(주기사항)</th><th></th></tr>';
+  var tp=0,tw=0;
+  ns.forEach(function(n){var o=A.by[n],len=A.mpp?o.len*A.mpp:o.len;tp+=len;tw+=len*n;
+    h+='<tr><td><span class="sw" style="display:inline-block;background:'+(WIRE_COL[n]||'#000')+'"></span> <b>'+n+'</b></td><td class="n">'+(n===2?'-':o.marks)+'</td><td class="n">'+len.toFixed(0)+'</td><td class="n">'+(len*n).toFixed(0)+'</td><td class="mini">'+esc(A.spec[n]||'')+'</td><td><button type="button" data-wn="'+n+'"'+(S.wireOnly===n?' class="on"':'')+'>'+(S.wireOnly===n?'모두':'보기')+'</button></td></tr>'});
+  h+='<tr><td><b>합계</b></td><td class="n">'+A.marks.length+'</td><td class="n"><b>'+tp.toFixed(0)+'</b></td><td class="n"><b>'+tw.toFixed(0)+'</b></td><td></td><td></td></tr></table>';
+  h+='<div class="g3" style="margin-top:8px"><button type="button" id="wShow">'+(S.wireShow?'가닥수 색 끄기':'가닥수 색으로 보기')+'</button><button type="button" id="wCopy">가닥수 표 복사</button></div>';
+  h+='<div class="mini" style="margin-top:4px">등기구 안 배선·여유장(보통 산출서에서 따로 더함)은 빠진 순 배관 길이예요. 산출서의 전선관·HFIX 수량과 비교할 때 참고만 하세요.</div></div>';
+  return h;
+}
+function bindWire(box){
+  box.querySelectorAll('[data-wn]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var n=+b.dataset.wn;S.wireOnly=S.wireOnly===n?null:n;S.wireShow=true;renderAutoPanel();draw()})});
+  var ws=box.querySelector('#wShow');if(ws)ws.addEventListener('click',function(){S.wireShow=!S.wireShow;if(!S.wireShow)S.wireOnly=null;renderAutoPanel();draw()});
+  var wc=box.querySelector('#wCopy');if(wc)wc.addEventListener('click',function(){var A=S.wire,rows=[['도면','가닥','빗금 표시','배관 m','전선 m','규격']];
+    Object.keys(A.by).map(Number).sort(function(a,b){return a-b}).forEach(function(n){var o=A.by[n],len=A.mpp?o.len*A.mpp:o.len;rows.push([S.pageName||S.pageNum,n,n===2?'':o.marks,len.toFixed(1),(len*n).toFixed(1),A.spec[n]||''])});
+    copyText(rows.map(function(r){return r.join('\t')}).join('\n'))});
+}
+function paintWire(k){
+  var A=S.wire;if(!A||!S.wireShow)return;
+  var byN={};A.W.forEach(function(s){var n=s._n||2;if(S.wireOnly&&S.wireOnly!==n)return;(byN[n]||(byN[n]=[])).push(s)});
+  ctx.globalAlpha=0.75;
+  Object.keys(byN).forEach(function(n){ctx.beginPath();byN[n].forEach(function(s){ctx.moveTo(s.p[0],s.p[1]);ctx.lineTo(s.p[2],s.p[3])});ctx.strokeStyle=WIRE_COL[n]||'#000';ctx.lineWidth=Math.max(0.9,2.5/k);ctx.stroke()});
+  ctx.globalAlpha=1;
+  if(k>1.2)A.marks.forEach(function(m){if(S.wireOnly&&S.wireOnly!==m.n)return;ctx.fillStyle=WIRE_COL[m.n]||'#000';ctx.font='bold '+(13/k)+'px sans-serif';ctx.fillText(String(m.n),m.x+1.2,m.y-1.2)});
 }
 /* ===================== 산출서·집계표(xlsx) 비교 ===================== */
 /* xlsx = zip 안의 XML. 브라우저 기본 기능(DecompressionStream·DOMParser)으로 기기 안에서만 읽는다 */
@@ -2703,14 +2791,14 @@ function renderAutoPanel(){
         '<div class="ab"><button type="button" data-go="'+g.id+'"'+(S.focusOnly===g.id?' class="on"':'')+'>'+(S.focusOnly===g.id?'모두 보기':'보기')+'</button><button type="button" data-as="'+g.id+'">'+(g.status==='none'?'도면에서 지정':'다시 지정')+'</button></div></div>';
     });
     h+='</div><div class="mini" style="margin-top:8px">‘보기’를 누르면 그 타입으로 인식한 것만 도면에 남습니다(다시 누르면 모두). 틀린 동그라미는 ‘보정’ 모드에서 눌러 빼거나 더할 수 있어요. ‘지정’은 도면에서 그 심벌 하나를 네모로 감싸면 그 모양으로 다시 셉니다.</div>'+
-      '<div class="g3" style="margin-top:8px"><button type="button" id="aCopy">집계표 복사</button><button type="button" id="aAll">모두 보기</button></div>'+(A.busy?'':boqHtml());
+      '<div class="g3" style="margin-top:8px"><button type="button" id="aCopy">집계표 복사</button><button type="button" id="aAll">모두 보기</button></div>'+(A.busy?'':wireHtml()+boqHtml());
     box.innerHTML=h;
     box.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var id=+b.dataset.go;
       if(S.focusOnly===id){S.focusOnly=null;S.active=null;S.groups.forEach(function(g){g.show=true});fitView();renderAutoPanel();draw();return}
       S.focusOnly=id;S.active=id;S.groups.forEach(function(g){g.show=g.id===id});var g=S.groups.filter(function(x){return x.id===id})[0];var pts=g.hits.filter(function(x){return !x.off});if(pts.length)zoomToPts(pts);else fitView();renderAutoPanel();draw();toast(g.type+'형으로 인식한 것만 표시합니다('+count(g)+'개). 다시 누르면 모두 보기.',3500)})});
     box.querySelectorAll('[data-as]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();S.assign=+b.dataset.as;var g=S.groups.filter(function(x){return x.id===S.assign})[0];setMode('sel');toast('도면을 확대한 뒤, '+g.type+'형 심벌 하나를 네모로 감싸 주세요.',5000)})});
     $('aAll').addEventListener('click',function(){S.groups.forEach(function(g){g.show=true});S.active=null;S.focusOnly=null;fitView();renderAutoPanel();draw()});
-    if(!A.busy){bindBoq(box);legStore()}
+    if(!A.busy){bindBoq(box);bindWire(box);legStore()}
     $('aCopy').addEventListener('click',function(){var rows=[['도면','타입','설명','찾은 수','표 수량','차이','상태']];A.items.forEach(function(g){var n=count(g);rows.push([S.pageName||S.pageNum,g.type,g.desc,n,g.qty==null?'':g.qty,g.qty==null?'':n-g.qty,{auto:'자동',manual:'지정',guess:'추정',none:'못 찾음'}[g.status]])});copyText(rows.map(function(r){return r.join('\t')}).join('\n'))});
     return;
   }
@@ -2784,7 +2872,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.6.1';
+var APP_VERSION='1.6.2';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
@@ -2837,7 +2925,7 @@ function checkLib(n){
   setStatus('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 페이지를 새로 열어 주세요.',true);
 }
 checkLib(10);
-window.__app={bareFixtures:bareFixtures,smallDots:smallDots,readXlsx:readXlsx,parseBoq:parseBoq,findCircles:findCircles,S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
+window.__app={draw:function(){draw()},wireAnalyze:wireAnalyze,bareFixtures:bareFixtures,smallDots:smallDots,readXlsx:readXlsx,parseBoq:parseBoq,findCircles:findCircles,S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
 })();
 </script>
 </body>
