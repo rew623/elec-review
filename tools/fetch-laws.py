@@ -1,6 +1,6 @@
 # 법령·기준 원문을 국가법령정보센터 공동활용 API로 받아 law-data.js로 만든다.
 #   python3 tools/fetch-laws.py   (OC는 본인 법제처 API 아이디로 바꿔도 됨, 기본 test)
-import json,urllib.request,urllib.parse,time,sys
+import json,urllib.request,urllib.parse,time,sys,re
 def get(path,**q):
     q.setdefault('OC','test');q.setdefault('type','JSON')
     u='https://www.law.go.kr/DRF/'+path+'?'+urllib.parse.urlencode(q)
@@ -91,7 +91,14 @@ SRC=[('law','건축물의 설비기준 등에 관한 규칙','피뢰설비·비�
      ('admrul','비상조명등의 화재안전기술기준(NFTC 304)','비상조명등','f304'),
      ('admrul','비상콘센트설비의 화재안전기술기준(NFTC 504)','비상콘센트','f504'),
      ('admrul','자동화재탐지설비 및 시각경보장치의 화재안전기술기준(NFTC 203)','자동화재탐지·시각경보','f203'),
-     ('admrul','비상방송설비의 화재안전기술기준(NFTC 202)','비상방송','f202')]
+     ('admrul','비상방송설비의 화재안전기술기준(NFTC 202)','비상방송','f202'),
+     ('law','전기공사업법','분리발주·시공관리책임자·하도급·시공책임형','ew'),
+     ('law','전기공사업법 시행령','시공관리책임자 지정·공사 범위','ewd'),
+     ('law','전기공사업법 시행규칙','시공관리책임자 지정 통지 등 서식','ewr'),
+     ('law','전력기술관리법','설계·감리 의무, 감리원 배치','pt'),
+     ('law','전력기술관리법 시행령','설계감리·공사감리 대상, 감리원 배치기준','ptd'),
+     ('law','전기안전관리법','사용전검사·정기검사·안전관리자','esl'),
+     ('admrul','전력시설물 공사감리업무 수행지침','착공~준공 감리(공사감독) 업무 절차','sup')]
 docs=[]
 for tgt,name,desc,key in SRC:
     try:
@@ -103,6 +110,8 @@ for tgt,name,desc,key in SRC:
     except Exception as e:
         print('FAIL',name,e,flush=True)
 import html,gzip,base64,os
+if len(docs)<len(SRC):
+    print('일부 실패 — law-data.js를 덮지 않습니다',len(docs),'/',len(SRC));sys.exit(1)
 D={'got':time.strftime('%Y-%m-%d'),'src':'국가법령정보센터 공동활용 API(law.go.kr)','d':docs}
 for d in D['d']:
     out=[];seen=set()
