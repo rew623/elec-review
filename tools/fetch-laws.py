@@ -12,7 +12,7 @@ def get(path,**q):
             time.sleep(2*(i+1))
     raise RuntimeError('fail '+u)
 def find(tgt,name):
-    d=get('lawSearch.do',target=tgt,query=name,display=20)
+    d=get('lawSearch.do',target=tgt,query=name,display=100)
     r=list(d.values())[0].get(tgt) or []
     if isinstance(r,dict):r=[r]
     key='법령명한글' if tgt=='law' else '행정규칙명'
@@ -98,7 +98,11 @@ SRC=[('law','건축물의 설비기준 등에 관한 규칙','피뢰설비·비�
      ('law','전력기술관리법','설계·감리 의무, 감리원 배치','pt'),
      ('law','전력기술관리법 시행령','설계감리·공사감리 대상, 감리원 배치기준','ptd'),
      ('law','전기안전관리법','사용전검사·정기검사·안전관리자','esl'),
-     ('admrul','전력시설물 공사감리업무 수행지침','착공~준공 감리(공사감독) 업무 절차','sup')]
+     ('admrul','전력시설물 공사감리업무 수행지침','착공~준공 감리(공사감독) 업무 절차','sup'),
+     ('admrul','전기설비기술기준','저압 전로 절연저항(제52조) 등 기술기준','tech')]
+# python3 tools/fetch-laws.py tech ew  → 이 키만 새로 받아 기존 law-data.js에 합친다
+ONLY=set(sys.argv[1:])
+if ONLY:SRC=[x for x in SRC if x[3] in ONLY]
 docs=[]
 for tgt,name,desc,key in SRC:
     try:
@@ -122,6 +126,12 @@ for d in D['d']:
         b=re.sub(r'(?<=[.다\)])\s*(?=(\d{1,2})\.\s?[가-힣「])',"\n",b)
         out.append({'n':c['n'],'t':t,'b':b})
     d['c']=out
+if ONLY:
+    import zlib
+    src=open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','law-data.js')).read()
+    old=json.loads(gzip.decompress(base64.b64decode(re.search(r'"([A-Za-z0-9+/=]{100,})"',src).group(1))))
+    new={d['k']:d for d in D['d']}
+    D['d']=[new.pop(d['k'],d) for d in old['d']]+list(new.values())
 raw=json.dumps(D,ensure_ascii=False,separators=(',',':')).encode()
 b64=base64.b64encode(gzip.compress(raw,9)).decode()
 dst=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','law-data.js')
