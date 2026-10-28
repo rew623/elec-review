@@ -2286,18 +2286,43 @@ async function runLegend(L,pn){
       }
       var grp={id:Date.now()+Math.random(),auto:true,name:name,type:it.type,desc:it.desc,qty:it.qty,status:status,simple:simple,lfilter:lfilter,
         color:AUTO_COL[ci++%AUTO_COL.length],expected:it.qty==null?'':String(it.qty),
-        tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:key,legend:li,circ:!!(sel.length&&findCircles(sel).length)};
+        tmpl:g?g.tmpl:[],cx:0,cy:0,tw:g?g.tw:4,th:g?g.th:4,hits:hits.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:key,legend:li,circ:!!(sel.length&&findCircles(sel).length),pure:pureCircle(sel)};
       S.groups.push(grp);S.auto.items.push(grp);
       if(t%2===1){setStatus('전등 자동 집계 중… '+it.type);renderAutoPanel();draw();await sleep0();if(S.pageNum!==pn)return}
     }
   }
+  /* 동그라미만 있는 심벌(D형 등)은 다른 원형 심벌(I형: 원+꼬리 등)의 원 부분에도 맞는다 → 다른 타입이 이미 잡은 자리는 그쪽으로 */
+  S.auto.items.forEach(function(g){
+    if(!g.pure||g.status==='manual')return;
+    var others=S.auto.items.filter(function(o){return o!==g&&!o.pure&&o.hits.length&&Math.max(o.tw,o.th)>=0.8*g.tw});
+    var h2=g.hits.filter(function(h){return !others.some(function(o){var rr=0.6*Math.max(o.tw,o.th);return o.hits.some(function(m){return Math.hypot(m.x-h.x,m.y-h.y)<rr})})});
+    if(h2.length<g.hits.length){g.hits=h2;if(g.qty!=null)g.status=h2.length===g.qty?'auto':'guess';g.note='다른 심벌(원+꼬리 등)과 겹친 자리는 그쪽 타입으로 넘김'}
+  });
+  /* 표 한 칸에 두 타입(C1·C2 등)이 같이 그려져 같은 틀이 나오면 하나로 합쳐 표 합계와 비교 */
+  for(var a1=0;a1<S.auto.items.length;a1++){var g1=S.auto.items[a1];
+    for(var a2=a1+1;a2<S.auto.items.length;a2++){var g2=S.auto.items[a2];
+      if(g1.bare||g2.bare||!g1.tmpl.length||g1.tmpl.length!==g2.tmpl.length||Math.abs(g1.tw-g2.tw)>0.01||Math.abs(g1.th-g2.th)>0.01||g1.hits.length!==g2.hits.length)continue;
+      if(!g1.hits.every(function(h,i){return Math.hypot(h.x-g2.hits[i].x,h.y-g2.hits[i].y)<0.01}))continue;
+      g1.type=g1.type+'·'+g2.type;g1.name=g1.type+(g1.desc?' · '+g1.desc:'');if(g1.qty!=null||g2.qty!=null)g1.qty=(g1.qty||0)+(g2.qty||0);g1.expected=g1.qty==null?'':String(g1.qty);
+      g1.status=g1.qty===g1.hits.length?'auto':'guess';g1.note='전등표 한 칸에 같이 그려진 타입이라 합쳐 셈(표 합계와 비교)';
+      S.auto.items.splice(a2,1);S.groups=S.groups.filter(function(x){return x!==g2});a2--;
+    }
+  }
+  /* 크기가 비슷한 두 타입이 같은 자리를 잡으면(C1 점무늬 네모 ⊂ C2 점무늬+아치 등) 선이 더 많은(더 자세한) 타입이 갖는다 */
+  S.auto.items.forEach(function(g){
+    if(g.status==='manual'||!g.hits.length)return;
+    var big=S.auto.items.filter(function(o){return o!==g&&o.hits.length&&o.tmpl.length>g.tmpl.length&&o.tw<=1.25*g.tw&&o.tw>=0.8*g.tw&&o.th<=1.25*g.th&&o.th>=0.8*g.th});
+    if(!big.length)return;
+    var h2=g.hits.filter(function(h){return !big.some(function(o){return o.hits.some(function(m){return Math.hypot(m.x-h.x,m.y-h.y)<0.3*Math.min(o.tw,g.tw)})})});
+    if(h2.length<g.hits.length){g.hits=h2;if(g.qty!=null)g.status=h2.length===g.qty?'auto':'guess';g.note='더 자세한 다른 심벌과 같은 자리는 그쪽 타입으로 넘김'}
+  });
   /* 원형 심벌(B·D·F형 등) 수가 표와 크게 다르면: PDF로 내보낼 때 등기구 심벌이 빠지고 배선 끝 꺾임 표시(/)와
      스위치 소문자만 남은 경우가 있다 → 그 위치를 '기호 없는 등기구'로 따로 센다 */
   var off=S.auto.items.filter(function(g){return g.circ&&g.qty>0&&g.status!=='manual'&&Math.abs(count(g)-g.qty)>0.3*g.qty});
   if(off.length){
     var bp=bareFixtures(ex).filter(function(p){return !S.auto.items.some(function(g){return !g.circ&&g.hits.some(function(h){return Math.hypot(h.x-p.x,h.y-p.y)<2.5})})});
     if(bp.length){
-      off.forEach(function(g){g.status='guess';g.note='도면에 이 심벌이 거의 안 그려져 있음 — 아래 ‘기호 없는 등기구’와 합쳐 비교'});
+      off.forEach(function(g){g.status='guess';g.hits=[];g.note='도면에 이 심벌이 안 그려져 있음(비슷한 원은 스위치 등이라 뺌) — 아래 ‘기호 없는 등기구’로 셈'});
       var q=off.reduce(function(a,g){return a+g.qty},0),tp=off.map(function(g){return g.type}).join('·');
       var bg={id:Date.now()+Math.random(),auto:true,bare:true,name:'기호 없는 등기구('+tp+' 추정)',type:tp,desc:'배선 끝 꺾임(/)+스위치 소문자',qty:q,status:'guess',
         color:AUTO_COL[ci++%AUTO_COL.length],expected:String(q),tmpl:[],cx:0,cy:0,tw:3,th:3,hits:bp.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:'bare|'+tp,legend:0,
@@ -2306,6 +2331,12 @@ async function runLegend(L,pn){
     }
   }
   S.auto.busy=false;setStatus('자동 집계 완료 · '+(S.pageName||S.pageNum+'쪽'));renderAutoPanel();renderSum();draw();
+}
+/* 틀 안 선이 모두 동그라미 조각이면(가운데 아주 작은 점은 허용) 동그라미만 있는 심벌 */
+function pureCircle(sel){
+  if(!sel.length)return false;var cl=findCircles(sel);if(!cl.length)return false;
+  var o=cl.reduce(function(a,b){return b.r>a.r?b:a});
+  return sel.every(function(q){return cl.some(function(c){return c.segs.indexOf(q)>=0})||Math.max(q.w,q.h)<0.3*o.r});
 }
 /* 배선(가장 많이 쓴 굵기의 선) 끝에 걸친 45° 짧은 꺾임 표시 중 옆에 스위치 소문자가 있는 자리 */
 function bareFixtures(ex){
@@ -2518,7 +2549,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.5.9';
+var APP_VERSION='1.5.10';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
