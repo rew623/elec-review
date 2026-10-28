@@ -2182,7 +2182,10 @@ function circleHits(sel,qty,excl,kFix){
       for(var i=0;i<l.length;i++){var q=l[i];if(Math.max(q.w,q.h)<0.45*c.r&&Math.hypot(q.cx-c.cx,q.cy-c.cy)<0.4*c.r&&c.segs.indexOf(q)<0)return true}}
     return false;
   }
-  var plan=(S.circles||[]).concat(S.fills||[]).filter(function(c){return !(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
+  /* 범례 원이 속 빈 고리면 도면의 채운 점(스위치 ● 등)은 후보에서 뺀다 */
+  var lr=o.segs[0]&&o.segs[0].lw?o.segs[0].lw/o.r:0;
+  function solid(c){if(c.filled)return true;var w=c.segs&&c.segs[0]&&c.segs[0].lw;return !!w&&w/c.r>Math.max(0.5,2.5*lr)}
+  var plan=(S.circles||[]).concat(S.fills||[]).filter(function(c){return !solid(c)&&!(excl&&excl.some(function(b){return c.cx>b[0]&&c.cx<b[2]&&c.cy>b[1]&&c.cy<b[3]}))});
   var hist={};plan.forEach(function(c){var k=c.r/o.r;if(k<0.15||k>2.5)return;var kk=Math.round(k*100)/100;hist[kk]=(hist[kk]||0)+1});
   var ks=Object.keys(hist).map(function(k){return {k:parseFloat(k),n:hist[k]}}).sort(function(a,b){return b.n-a.n}).slice(0,10);
   if(kFix)ks=[{k:kFix,n:1}];
@@ -2320,15 +2323,24 @@ async function runLegend(L,pn){
      스위치 소문자만 남은 경우가 있다 → 그 위치를 '기호 없는 등기구'로 따로 센다 */
   var off=S.auto.items.filter(function(g){return g.circ&&g.qty>0&&g.status!=='manual'&&Math.abs(count(g)-g.qty)>0.3*g.qty});
   if(off.length){
-    var bp=bareFixtures(ex).filter(function(p){return !S.auto.items.some(function(g){return !g.circ&&g.hits.some(function(h){return Math.hypot(h.x-p.x,h.y-p.y)<2.5})})});
-    if(bp.length){
-      off.forEach(function(g){g.status='guess';g.hits=[];g.note='도면에 이 심벌이 안 그려져 있음(비슷한 원은 스위치 등이라 뺌) — 아래 ‘기호 없는 등기구’로 셈'});
-      var q=off.reduce(function(a,g){return a+g.qty},0),tp=off.map(function(g){return g.type}).join('·');
-      var bg={id:Date.now()+Math.random(),auto:true,bare:true,name:'기호 없는 등기구('+tp+' 추정)',type:tp,desc:'배선 끝 꺾임(/)+스위치 소문자',qty:q,status:'guess',
-        color:AUTO_COL[ci++%AUTO_COL.length],expected:String(q),tmpl:[],cx:0,cy:0,tw:3,th:3,hits:bp.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:'bare|'+tp,legend:0,
-        note:'심벌 없이 배선 끝에 꺾임 표시(/)와 a·b·c 소문자만 있는 자리를 등기구로 셈. 표의 '+tp+'형 합계('+q+')와 비교'};
+    var near0=function(p){return S.auto.items.some(function(g){return !g.circ&&g.qty!==0&&g.hits.some(function(h){return Math.hypot(h.x-p.x,h.y-p.y)<2.5})})};
+    var dots=smallDots(ex).filter(function(p){return !near0(p)});
+    var bp=bareFixtures(ex).filter(function(p){return !near0(p)&&!dots.some(function(d){return Math.hypot(d.x-p.x,d.y-p.y)<2.5})});
+    var sets=[];
+    if(off.length>=2&&dots.length&&bp.length){
+      var od=off.slice().sort(function(x,y){return Math.abs(x.qty-dots.length)-Math.abs(y.qty-dots.length)})[0];
+      sets.push({pts:bp,types:off.filter(function(g){return g!==od}),how:'배선 끝 꺾임(/)+스위치 소문자'});
+      sets.push({pts:dots,types:[od],how:'배선 끝 작은 점(•)+스위치 소문자'});
+    }else if(bp.length||dots.length)sets.push({pts:bp.concat(dots),types:off,how:'배선 끝 꺾임(/)·작은 점(•)+스위치 소문자'});
+    if(sets.length)off.forEach(function(g){g.status='guess';g.hits=[];g.note='도면에 이 심벌이 안 그려져 있음(비슷한 원은 스위치 등이라 뺌) — 아래 ‘기호 없는 등기구’로 셈'});
+    sets.forEach(function(st){
+      if(!st.pts.length)return;
+      var q=st.types.reduce(function(x,g){return x+g.qty},0),tp=st.types.map(function(g){return g.type}).join('·');
+      var bg={id:Date.now()+Math.random(),auto:true,bare:true,name:'기호 없는 등기구('+tp+' 추정)',type:tp,desc:st.how,qty:q,status:'guess',
+        color:AUTO_COL[ci++%AUTO_COL.length],expected:String(q),tmpl:[],cx:0,cy:0,tw:3,th:3,hits:st.pts.map(function(h){return {x:h.x,y:h.y,off:false}}),manual:[],show:!S.focusOnly,key:'bare|'+tp,legend:0,
+        note:'심벌 없이 '+st.how+'만 있는 자리를 등기구로 셈. 표의 '+tp+'형('+q+')과 비교'};
       S.groups.push(bg);S.auto.items.push(bg);
-    }
+    });
   }
   S.auto.busy=false;setStatus('자동 집계 완료 · '+(S.pageName||S.pageNum+'쪽'));renderAutoPanel();renderSum();draw();
 }
@@ -2338,6 +2350,24 @@ function pureCircle(sel){
   var o=cl.reduce(function(a,b){return b.r>a.r?b:a});
   return sel.every(function(q){return cl.some(function(c){return c.segs.indexOf(q)>=0})||Math.max(q.w,q.h)<0.3*o.r});
 }
+/* 배선 끝의 작은 채운 점(스위치 ●보다 작음) 중 옆에 스위치 소문자가 있는 자리 */
+function smallDots(ex){
+  var sol=[];
+  (S.circles||[]).forEach(function(c){var w=c.segs[0]&&c.segs[0].lw;if(w&&w/c.r>0.5)sol.push({x:c.cx,y:c.cy,e:c.r+w/2})});
+  (S.fills||[]).forEach(function(f){if(f.filled)sol.push({x:f.cx,y:f.cy,e:f.r})});
+  if(sol.length<4)return [];
+  var hc={},mode=0,mn=0;sol.forEach(function(c){var k=Math.round(c.e*20)/20;hc[k]=(hc[k]||0)+1;if(hc[k]>mn){mn=hc[k];mode=k}});
+  var lt=S.texts.filter(function(t){return /^[a-z]$/.test(t.s.trim())}),out=[];
+  sol.forEach(function(c){
+    if(c.e>0.8*mode||c.e<0.3*mode)return;
+    if(ex.some(function(b){return c.x>b[0]&&c.x<b[2]&&c.y>b[1]&&c.y<b[3]}))return;
+    if(sol.some(function(o){return o!==c&&o.e>0.8*mode&&Math.hypot(o.x-c.x,o.y-c.y)<3*mode}))return; /* 스위치 무리 옆 */
+    if(!lt.some(function(t){return Math.hypot(t.x+t.w/2-c.x,t.y-t.z*0.35-c.y)<6*c.e}))return;
+    if(out.some(function(o){return Math.hypot(o.x-c.x,o.y-c.y)<c.e}))return;
+    out.push({x:c.x,y:c.y});
+  });
+  return out;
+}
 /* 배선(가장 많이 쓴 굵기의 선) 끝에 걸친 45° 짧은 꺾임 표시 중 옆에 스위치 소문자가 있는 자리 */
 function bareFixtures(ex){
   var L=S.D.filter(function(s){return s.p.length===4}),G={},lws={};
@@ -2346,10 +2376,11 @@ function bareFixtures(ex){
   if(!wl)return [];
   L.forEach(function(s){if(Math.abs(s.lw-wl)>0.1*wl)return;[[s.p[0],s.p[1]],[s.p[2],s.p[3]]].forEach(function(e){var kk=Math.floor(e[0])+','+Math.floor(e[1]);(G[kk]||(G[kk]=[])).push(e)})});
   var lt=S.texts.filter(function(t){return /^[a-z]$/.test(t.s.trim())}),pts=[];
+  if(!lt.length)return [];var zs=lt.map(function(t){return t.z}).sort(function(a,b){return a-b}),zl=zs[zs.length>>1];
   L.forEach(function(s){
-    if(s.lw>=wl*0.95)return;
+    if(s.lw>wl*1.05)return;
     var dx=s.p[2]-s.p[0],dy=s.p[3]-s.p[1],len=Math.hypot(dx,dy);
-    if(len<wl*1.7||len>wl*3.7||Math.abs(Math.abs(dx)-Math.abs(dy))/len>0.15)return;
+    if(len<0.26*zl||len>0.6*zl||Math.abs(Math.abs(dx)-Math.abs(dy))/len>0.15)return;
     var mx=s.cx,my=s.cy,ok=false;
     for(var i=-1;i<=1&&!ok;i++)for(var j=-1;j<=1&&!ok;j++){var l=G[(Math.floor(mx)+i)+','+(Math.floor(my)+j)];if(l)ok=l.some(function(e){return Math.hypot(e[0]-mx,e[1]-my)<0.47*len})}
     if(!ok)return;
@@ -2753,7 +2784,7 @@ setTimeout(function(){if(window.__app){window.__app.assignFromBox=assignFromBox;
     clearTimeout(exitT);exitT=setTimeout(function(){waitExit=false;guard()},2000);
   });
 })();
-var APP_VERSION='1.6.0';
+var APP_VERSION='1.6.1';
 (function(){
   var vb=$('verBtn');if(vb)vb.textContent='v'+APP_VERSION;
   var web=/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator;
@@ -2806,7 +2837,7 @@ function checkLib(n){
   setStatus('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 페이지를 새로 열어 주세요.',true);
 }
 checkLib(10);
-window.__app={readXlsx:readXlsx,parseBoq:parseBoq,findCircles:findCircles,S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
+window.__app={bareFixtures:bareFixtures,smallDots:smallDots,readXlsx:readXlsx,parseBoq:parseBoq,findCircles:findCircles,S:S,scanAll:scanAll,renderAll:renderAll,runReview:runReview,setTab:setTab,loadPage:loadPage,openPdf:openPdf,addGroupFromBox:addGroupFromBox,count:count,findHits:findHits};
 })();
 </script>
 </body>
